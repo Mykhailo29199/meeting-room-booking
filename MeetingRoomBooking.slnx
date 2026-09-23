@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MeetingRoomBooking.Api/MeetingRoomBooking.Api.csproj" />
+    <Project Path="src/MeetingRoomBooking.Application/MeetingRoomBooking.Application.csproj" />
+    <Project Path="src/MeetingRoomBooking.Domain/MeetingRoomBooking.Domain.csproj" />
+    <Project Path="src/MeetingRoomBooking.Infrastructure/MeetingRoomBooking.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MeetingRoomBooking.Tests/MeetingRoomBooking.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MeetingRoomBooking.Application\MeetingRoomBooking.Application.csproj" />
+    <ProjectReference Include="..\MeetingRoomBooking.Infrastructure\MeetingRoomBooking.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
