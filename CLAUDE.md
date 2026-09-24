@@ -66,6 +66,13 @@ Infrastructure ──┘        (implements Application's interfaces)
     `IBookingRepository`, and the two exceptions a commit can raise:
     `UniqueConstraintViolationException` (slot taken → 409) and
     `ConcurrencyConflictException` (stale edit → 409).
+  - `Bookings/BookingService` — create, cancel, day schedule. Services are
+    concrete classes registered in `Program.cs`; they get the caller as a
+    `Common/UserContext(UserId, IsAdmin)` parameter and "now" from an
+    injected `TimeProvider` (tests use `FixedTimeProvider`).
+  - `Common/Exceptions.cs` — use-case outcomes the API maps to HTTP:
+    `NotFoundException` 404, `ForbiddenException` 403, `ConflictException`
+    409. Domain rule violations stay `DomainException` → 400.
 - `src/MeetingRoomBooking.Infrastructure` — EF Core (Identity and SignalR
   planned).
   - `Persistence/AppDbContext` plus one `IEntityTypeConfiguration` per entity
@@ -114,6 +121,19 @@ Infrastructure ──┘        (implements Application's interfaces)
   non-UTC `DateTime`s. `nowUtc` is passed in explicitly (the Application
   layer supplies it), so time-dependent rules are testable. EF Core must
   mark `DateTime`s it reads as `DateTimeKind.Utc`.
+- **Booking behaviour.** "Cancel" releases every slot that has not started
+  yet (`Booking.Release`): before the start it deletes the whole booking;
+  while it is under way ("we finished early") it frees the future slots,
+  keeps the past ones and the slot in progress, and moves `EndUtc` back;
+  when nothing is left to release it is a 400. A user does this only to
+  their own bookings; an admin to any. Cancellation is not in the task
+  brief — it exists because item 7 talks about slot status *changing*, and
+  a slot becomes free only when released. A schedule shows
+  every slot as free/booked/past but never reveals who booked someone else's
+  slot (`BookingId` only on the viewer's own slots); admins get a separate
+  all-bookings view. A booking that commits at the same moment an admin
+  deactivates the resource is accepted on purpose: deactivation keeps
+  existing bookings, so it equals booking just before — no lock needed.
 - **Users never see UTC.** The API returns slots in UTC plus the resource's
   `TimeZoneId`; the frontend shows a schedule in the *resource's* local time,
   labelled (e.g. "Berlin time (UTC+2)"), and adds the viewer's own time as a
@@ -128,11 +148,13 @@ Infrastructure ──┘        (implements Application's interfaces)
 
 ## Not built yet
 
-Booking service, concurrency test, auth, API endpoints, SignalR, Angular
-client, Azure deployment. What exists: the Domain layer, the persistence
-layer (EF Core model, unit of work, repositories, `InitialCreate` migration in
-`Infrastructure/Persistence/Migrations`), the API wired to the database (no
-endpoints yet), and their tests.
+Auth, API endpoints (and HTTP error mapping), resource management and
+all-bookings admin use cases, the parallel-requests concurrency test,
+SignalR, Angular client, Azure deployment. What exists: the Domain layer,
+the persistence layer (EF Core model, unit of work, repositories,
+`InitialCreate` migration in `Infrastructure/Persistence/Migrations`), the
+booking service (create, cancel, schedule), the API wired to the database
+(no endpoints yet), and their tests.
 
 ## Tests and databases
 

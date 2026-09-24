@@ -155,6 +155,58 @@ public class BookingTests
         Assert.Throws<ArgumentException>(() => Booking.Create(OpenResource(), "user-1", start, Berlin(11, 0), NowUtc));
     }
 
+    [Theory]
+    [InlineData(9, 45)] // before the start
+    [InlineData(10, 0)] // exactly at the start: no slot has begun yet
+    public void Releasing_a_booking_that_has_not_started_cancels_it(int nowH, int nowM)
+    {
+        var booking = Booking.Create(OpenResource(), "user-1", Berlin(10, 0), Berlin(11, 0), NowUtc);
+
+        var outcome = booking.Release(Berlin(nowH, nowM));
+
+        Assert.Equal(ReleaseOutcome.Cancelled, outcome);
+        Assert.Equal(4, booking.Slots.Count); // untouched: the caller deletes the whole booking
+    }
+
+    [Fact]
+    public void Releasing_a_booking_under_way_frees_the_future_and_keeps_the_slot_in_progress()
+    {
+        // Booked 08:00–20:00, finished early and released at 14:05.
+        var booking = Booking.Create(OpenResource(), "user-1", Berlin(8, 0), Berlin(20, 0), NowUtc);
+
+        var outcome = booking.Release(Berlin(14, 5));
+
+        Assert.Equal(ReleaseOutcome.Shortened, outcome);
+        Assert.Equal(Berlin(8, 0), booking.StartUtc);
+        Assert.Equal(Berlin(14, 15), booking.EndUtc);         // 14:00–14:15 is in progress, kept
+        Assert.Equal(25, booking.Slots.Count);                 // 08:00 ... 14:00
+        Assert.Equal(Berlin(14, 0), booking.Slots.Max(s => s.SlotStartUtc));
+    }
+
+    [Fact]
+    public void Releasing_exactly_on_a_slot_boundary_frees_that_slot_too()
+    {
+        var booking = Booking.Create(OpenResource(), "user-1", Berlin(8, 0), Berlin(20, 0), NowUtc);
+
+        booking.Release(Berlin(14, 0));
+
+        Assert.Equal(Berlin(14, 0), booking.EndUtc);
+        Assert.Equal(24, booking.Slots.Count); // 08:00 ... 13:45
+    }
+
+    [Theory]
+    [InlineData(10, 50)] // only the last slot (10:45–11:00) is left, and it is in progress
+    [InlineData(11, 0)]  // exactly at the end
+    [InlineData(12, 0)]  // long over
+    public void Nothing_to_release_is_rejected(int nowH, int nowM)
+    {
+        var booking = Booking.Create(OpenResource(), "user-1", Berlin(10, 0), Berlin(11, 0), NowUtc);
+
+        Assert.Throws<DomainException>(() => booking.Release(Berlin(nowH, nowM)));
+        Assert.Equal(Berlin(11, 0), booking.EndUtc);
+        Assert.Equal(4, booking.Slots.Count);
+    }
+
     [Fact]
     public void User_id_is_required()
     {

@@ -81,6 +81,38 @@ public class Booking
         return booking;
     }
 
+    /// <summary>
+    /// Gives back every slot that has not started yet, so others can book it.
+    ///
+    /// - Not started yet: all slots are released — the booking is cancelled
+    ///   (<see cref="ReleaseOutcome.Cancelled"/>; the caller deletes it).
+    /// - Under way, e.g. booked 08:00–20:00 and released at 14:05: the slot in
+    ///   progress (14:00–14:15) and the past ones stay, so the history remains;
+    ///   14:15–20:00 is released and the booking now ends at 14:15
+    ///   (<see cref="ReleaseOutcome.Shortened"/>).
+    /// - Nothing left to release (over, or only the current slot remains):
+    ///   <see cref="DomainException"/>.
+    /// </summary>
+    /// <remarks>Requires <see cref="Slots"/> to be loaded.</remarks>
+    public ReleaseOutcome Release(DateTime nowUtc)
+    {
+        EnsureUtc(nowUtc, nameof(nowUtc));
+        if (_slots.Count == 0)
+            throw new InvalidOperationException("The booking's slots must be loaded before releasing it.");
+
+        var startedSlots = _slots.Count(s => s.SlotStartUtc < nowUtc);
+        if (startedSlots == 0)
+            return ReleaseOutcome.Cancelled;
+        if (startedSlots == _slots.Count)
+            throw new DomainException(EndUtc <= nowUtc
+                ? "This booking is already over."
+                : "Only the time slot in progress is left, so there is nothing to release.");
+
+        _slots.RemoveAll(s => s.SlotStartUtc >= nowUtc);
+        EndUtc = StartUtc + startedSlots * TimeSlots.Length;
+        return ReleaseOutcome.Shortened;
+    }
+
     private static void EnsureUtc(DateTime value, string paramName)
     {
         if (value.Kind != DateTimeKind.Utc)
