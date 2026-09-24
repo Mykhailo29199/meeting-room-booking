@@ -29,7 +29,13 @@ They create and drop their own temporary databases.
    ```bash
    cp src/MeetingRoomBooking.Api/appsettings.Development.example.json src/MeetingRoomBooking.Api/appsettings.Development.json
    ```
-   and set `ConnectionStrings:Default` to your SQL Server.
+   and fill in:
+   - `ConnectionStrings:Default` — your SQL Server;
+   - `Jwt:Key` — any random secret of at least 32 characters (the API will not
+     start without it);
+   - `Seed:AdminEmail` / `Seed:AdminPassword` — the admin account created on
+     startup (8+ characters with upper and lower case, a digit and a symbol).
+     Registration through the API only ever creates regular users.
 2. Create the database:
    ```bash
    dotnet tool restore

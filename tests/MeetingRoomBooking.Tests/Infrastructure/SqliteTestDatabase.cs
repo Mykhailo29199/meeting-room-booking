@@ -35,6 +35,8 @@ internal sealed class SqliteTestDatabase : IAsyncDisposable
         return database;
     }
 
+    public string ConnectionString => _connectionString;
+
     public AppDbContext CreateContext() =>
         new(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connectionString).Options);
 

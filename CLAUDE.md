@@ -85,12 +85,16 @@ Infrastructure ──┘        (implements Application's interfaces)
     unique-violation error. Production: SQL Server 2627/2601. Tests register
     the SQLite version (`tests/.../Infrastructure/SqliteTestDatabase.cs`); no
     production class is subclassed for tests.
+  - `Identity/` — `ApplicationUser`, `AuthService` (implements
+    Application's `IAuthService`), `JwtTokenService` + `JwtOptions` (the
+    `Jwt` config section, validated on start), `IdentitySeeder`.
   - `DependencyInjection.AddInfrastructure` — registers all of the above;
-    needs `ConnectionStrings:Default`.
+    needs `ConnectionStrings:Default` and the `Jwt` section.
 - `src/MeetingRoomBooking.Api` — controllers, `Program.cs`, middleware.
   Controllers stay thin and only call Application services.
   - `Errors/ApplicationExceptionHandler` — the only place exceptions become
-    HTTP: `DomainException` 400, `NotFoundException` 404,
+    HTTP: `DomainException` 400, `ValidationException` 400 (with per-field
+    `errors`), `AuthenticationFailedException` 401, `NotFoundException` 404,
     `ForbiddenException` 403, `ConflictException` and
     `ConcurrencyConflictException` 409, as RFC 9457 problem details whose
     `detail` is the user-facing message. Everything else (including a raw
@@ -153,24 +157,40 @@ Infrastructure ──┘        (implements Application's interfaces)
   it never converts user input itself.
 - Use `Europe/Berlin` (or another long-stable id) in tests: Windows ICU on
   some machines does not know `Europe/Kyiv`, only the old `Europe/Kiev`.
-- **Auth:** JWT signed with HS256 using `Jwt:Key`. Registration always yields
-  `User`; an `Admin` is created only by a startup seeder from
-  `Seed:AdminEmail` / `Seed:AdminPassword` config.
+- **Auth.** ASP.NET Core Identity (users/roles in the same database, via
+  `IdentityDbContext<ApplicationUser>`) plus JWT bearer tokens signed with
+  HS256 (`Jwt:Key`, ≥ 32 chars; the app refuses to start without it), 60
+  minutes, no refresh tokens. Claims keep their short JWT names (`sub` = user
+  id = `Booking.UserId`, `email`, `name`, `role`); the API turns off inbound
+  claim mapping. `POST /api/auth/register` always gives role `User` and
+  signs in; `POST /api/auth/login` answers wrong password and unknown email
+  with the same 401 message; `GET /api/auth/me` echoes the token. An
+  `Admin` exists only through `IdentitySeeder` (startup) from
+  `Seed:AdminEmail` / `Seed:AdminPassword` — never from registration, never
+  hard-coded. Controllers get the caller via `User.ToUserContext()`
+  (`Api/Auth/ClaimsPrincipalExtensions`). `Bookings.UserId` deliberately has
+  no foreign key to `AspNetUsers`: accounts and bookings stay decoupled, and
+  user ids only ever come from validated tokens.
 
 ## Not built yet
 
-Auth, Swagger UI, API endpoints, resource management and all-bookings admin
-use cases, the parallel-requests concurrency test, SignalR, Angular client,
-Azure deployment. What exists: the Domain layer, the persistence layer (EF
-Core model, unit of work, repositories, `InitialCreate` migration in
-`Infrastructure/Persistence/Migrations`), the booking service (create,
-cancel, schedule), the API wired to the database with exception-to-HTTP
-mapping (no endpoints yet), and their tests.
+Swagger UI, booking/schedule/resource endpoints, resource management and
+all-bookings admin use cases, the parallel-requests concurrency test,
+SignalR, Angular client, Azure deployment. What exists: the Domain layer,
+the persistence layer (EF Core model, unit of work, repositories, migrations
+`InitialCreate` and `AddIdentity`), the booking service (create, cancel,
+schedule), authentication (register, login, me, roles, admin seeding), the
+exception-to-HTTP mapping, and their tests.
 
 ## Tests and databases
 
 - Default `dotnet test` runs everything on SQLite — no setup, so a reviewer
   can run it anywhere.
+- HTTP-level tests use `tests/.../Api/ApiFactory` (`WebApplicationFactory`):
+  the real Program on SQLite, environment `Testing` (so the developer's
+  appsettings.Development.json is never read), a random test `Jwt:Key` and a
+  test admin. `ApiFactory.RegisterAsync()` / `CreateClient(token)` give a
+  signed-in client.
 - `SqlServerPersistenceTests` (`[SqlServerFact]`) cover what SQLite cannot:
   SQL Server's duplicate-key error numbers and the migrations. They run only
   when `MEETINGROOMBOOKING_TEST_SQLSERVER` holds a server connection string;

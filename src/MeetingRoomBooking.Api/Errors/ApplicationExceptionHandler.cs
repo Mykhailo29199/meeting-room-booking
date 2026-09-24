@@ -29,22 +29,26 @@ public sealed class ApplicationExceptionHandler : IExceptionHandler
             return false;
 
         httpContext.Response.StatusCode = status.Value;
+        var problem = exception is ValidationException validation
+            ? new HttpValidationProblemDetails(validation.Errors.ToDictionary(e => e.Key, e => e.Value))
+            : new ProblemDetails();
+        problem.Status = status;
+        problem.Title = title;
+        problem.Detail = exception.Message;
+
         return await _problemDetails.TryWriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
             Exception = exception,
-            ProblemDetails = new ProblemDetails
-            {
-                Status = status,
-                Title = title,
-                Detail = exception.Message
-            }
+            ProblemDetails = problem
         });
     }
 
     internal static (int? Status, string? Title) Map(Exception exception) => exception switch
     {
         DomainException => (StatusCodes.Status400BadRequest, "The request breaks a business rule."),
+        ValidationException => (StatusCodes.Status400BadRequest, "Some fields are invalid."),
+        AuthenticationFailedException => (StatusCodes.Status401Unauthorized, "Sign-in failed."),
         NotFoundException => (StatusCodes.Status404NotFound, "Not found."),
         ForbiddenException => (StatusCodes.Status403Forbidden, "Not allowed."),
         // A lost race — the slot was just taken, or the resource was just edited
