@@ -77,6 +77,8 @@ client, Azure deployment.
   says what changed and why. Claude prepares and verifies each step and
   proposes the commit message; the developer reviews and commits. Claude
   does not run `git commit` itself.
+- Before proposing a commit, run `/verify-step`; draft the commit with
+  `/prepare-commit`. Both skills live in `.claude/skills/`.
 - The build must stay warning-free — `TreatWarningsAsErrors` is on for every
   project via `Directory.Build.props`.
 - Secrets never go into committed files. `appsettings.Development.json` is

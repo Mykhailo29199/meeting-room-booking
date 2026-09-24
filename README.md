@@ -23,3 +23,7 @@ builds and tests, and proposes commit messages.
 
 - [`CLAUDE.md`](CLAUDE.md) holds the design decisions and working rules that
   Claude follows in every session.
+- Custom skills in [`.claude/skills/`](.claude/skills) automate the routine
+  before every commit: `/verify-step` (clean build, tests, what would be
+  committed, secret scan, docs still accurate) and `/prepare-commit` (checks
+  the change is one logical commit and drafts its message).
