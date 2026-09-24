@@ -1,6 +1,9 @@
+using MeetingRoomBooking.Infrastructure;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Database, unit of work and repositories (needs ConnectionStrings:Default).
+builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

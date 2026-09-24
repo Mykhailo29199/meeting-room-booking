@@ -128,14 +128,25 @@ Infrastructure ──┘        (implements Application's interfaces)
 
 ## Not built yet
 
-API wiring and migrations, booking service, concurrency test, auth, API
-endpoints, SignalR, Angular client, Azure deployment. What exists: the Domain
-layer, the persistence layer (EF Core model, unit of work, repositories) and
-their tests on SQLite.
+Booking service, concurrency test, auth, API endpoints, SignalR, Angular
+client, Azure deployment. What exists: the Domain layer, the persistence
+layer (EF Core model, unit of work, repositories, `InitialCreate` migration in
+`Infrastructure/Persistence/Migrations`), the API wired to the database (no
+endpoints yet), and their tests.
 
-Known gap: `SqlServerUniqueConstraintViolationDetector` (error numbers
-2627/2601) is not covered by an automated test — all tests run on SQLite. It
-needs a test against a real SQL Server before relying on it.
+## Tests and databases
+
+- Default `dotnet test` runs everything on SQLite — no setup, so a reviewer
+  can run it anywhere.
+- `SqlServerPersistenceTests` (`[SqlServerFact]`) cover what SQLite cannot:
+  SQL Server's duplicate-key error numbers and the migrations. They run only
+  when `MEETINGROOMBOOKING_TEST_SQLSERVER` holds a server connection string;
+  otherwise they are reported as skipped. Each test class creates and drops
+  its own `MeetingRoomBookingTests_<guid>` database by applying the migrations.
+- Local dev database: `MeetingRoomBookingDb` on `MMU\MSSQLSERVER01`. Never
+  modify or drop any other database on that server.
+- After changing the EF model, add a migration (command below) and check that
+  `dotnet ef migrations has-pending-model-changes` reports none.
 
 ## Working conventions
 
@@ -161,4 +172,9 @@ needs a test against a real SQL Server before relying on it.
 dotnet build MeetingRoomBooking.slnx
 dotnet test MeetingRoomBooking.slnx
 dotnet run --project src/MeetingRoomBooking.Api
+
+# EF Core CLI is a local tool pinned in dotnet-tools.json
+dotnet tool restore
+dotnet ef migrations add <Name> --project src/MeetingRoomBooking.Infrastructure --startup-project src/MeetingRoomBooking.Api --output-dir Persistence/Migrations
+dotnet ef database update --project src/MeetingRoomBooking.Infrastructure --startup-project src/MeetingRoomBooking.Api
 ```
