@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\MeetingRoomBooking.Application\MeetingRoomBooking.Application.csproj" />
     <ProjectReference Include="..\..\src\MeetingRoomBooking.Infrastructure\MeetingRoomBooking.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\MeetingRoomBooking.Api\MeetingRoomBooking.Api.csproj" />
   </ItemGroup>
 
 </Project>

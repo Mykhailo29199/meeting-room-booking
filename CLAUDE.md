@@ -89,6 +89,17 @@ Infrastructure ──┘        (implements Application's interfaces)
     needs `ConnectionStrings:Default`.
 - `src/MeetingRoomBooking.Api` — controllers, `Program.cs`, middleware.
   Controllers stay thin and only call Application services.
+  - `Errors/ApplicationExceptionHandler` — the only place exceptions become
+    HTTP: `DomainException` 400, `NotFoundException` 404,
+    `ForbiddenException` 403, `ConflictException` and
+    `ConcurrencyConflictException` 409, as RFC 9457 problem details whose
+    `detail` is the user-facing message. Everything else (including a raw
+    `UniqueConstraintViolationException` a service forgot to translate) is a
+    bug and becomes a generic 500. Don't catch-and-map exceptions in
+    controllers.
+- Wording rule for comments and commit messages: inner layers *throw*; only
+  the API *returns* status codes — write "throws ConflictException, which the
+  API returns as 409", not "the service returns 409".
 - `tests/MeetingRoomBooking.Tests` — xUnit tests, including the concurrency
   test.
 
@@ -148,13 +159,13 @@ Infrastructure ──┘        (implements Application's interfaces)
 
 ## Not built yet
 
-Auth, API endpoints (and HTTP error mapping), resource management and
-all-bookings admin use cases, the parallel-requests concurrency test,
-SignalR, Angular client, Azure deployment. What exists: the Domain layer,
-the persistence layer (EF Core model, unit of work, repositories,
-`InitialCreate` migration in `Infrastructure/Persistence/Migrations`), the
-booking service (create, cancel, schedule), the API wired to the database
-(no endpoints yet), and their tests.
+Auth, Swagger UI, API endpoints, resource management and all-bookings admin
+use cases, the parallel-requests concurrency test, SignalR, Angular client,
+Azure deployment. What exists: the Domain layer, the persistence layer (EF
+Core model, unit of work, repositories, `InitialCreate` migration in
+`Infrastructure/Persistence/Migrations`), the booking service (create,
+cancel, schedule), the API wired to the database with exception-to-HTTP
+mapping (no endpoints yet), and their tests.
 
 ## Tests and databases
 

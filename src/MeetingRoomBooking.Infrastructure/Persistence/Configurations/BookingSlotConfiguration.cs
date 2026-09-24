@@ -17,8 +17,10 @@ internal sealed class BookingSlotConfiguration : IEntityTypeConfiguration<Bookin
         // refuses a second row for the same slot of the same resource. When
         // several requests try to book overlapping times at once, every one of
         // them inserts its slots, the database accepts exactly one, and the
-        // others fail with a unique-key violation (SQL Server error 2627) that
-        // UnitOfWork turns into UniqueConstraintViolationException -> HTTP 409.
+        // others fail with a unique-key violation (SQL Server error 2627).
+        // UnitOfWork turns it into UniqueConstraintViolationException,
+        // BookingService into ConflictException, and the API's
+        // ApplicationExceptionHandler into HTTP 409.
         // There is no "check if free, then insert" step to race against.
         //
         // As a clustered primary key it also keeps a resource's slots

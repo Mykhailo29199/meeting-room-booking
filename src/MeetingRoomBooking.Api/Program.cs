@@ -1,3 +1,4 @@
+using MeetingRoomBooking.Api.Errors;
 using MeetingRoomBooking.Application.Bookings;
 using MeetingRoomBooking.Infrastructure;
 
@@ -14,9 +15,16 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Errors: application exceptions -> 400/403/404/409 problem details;
+// anything else -> generic 500 problem details.
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ApplicationExceptionHandler>();
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
