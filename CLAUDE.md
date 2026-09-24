@@ -60,9 +60,26 @@ Infrastructure ──┘        (implements Application's interfaces)
   - Entities have private setters and a private parameterless constructor
     for EF Core; IDs are `Guid.CreateVersion7()`.
 - `src/MeetingRoomBooking.Application` — use cases (services), DTOs, and the
-  interfaces Infrastructure implements (repositories, unit of work,
-  notifier). References Domain only — in particular, no EF Core.
-- `src/MeetingRoomBooking.Infrastructure` — EF Core, Identity, SignalR.
+  interfaces Infrastructure implements. References Domain only — in
+  particular, no EF Core.
+  - `Persistence/` — `IUnitOfWork` (single commit point), `IResourceRepository`,
+    `IBookingRepository`, and the two exceptions a commit can raise:
+    `UniqueConstraintViolationException` (slot taken → 409) and
+    `ConcurrencyConflictException` (stale edit → 409).
+- `src/MeetingRoomBooking.Infrastructure` — EF Core (Identity and SignalR
+  planned).
+  - `Persistence/AppDbContext` plus one `IEntityTypeConfiguration` per entity
+    in `Persistence/Configurations/`. `BookingSlotConfiguration` holds the
+    concurrency-critical primary key.
+  - `Persistence/UnitOfWork` — the only caller of `SaveChangesAsync`;
+    translates `DbUpdateConcurrencyException` and unique violations, lets
+    everything else propagate.
+  - `IUniqueConstraintViolationDetector` — recognises the provider's
+    unique-violation error. Production: SQL Server 2627/2601. Tests register
+    the SQLite version (`tests/.../Infrastructure/SqliteTestDatabase.cs`); no
+    production class is subclassed for tests.
+  - `DependencyInjection.AddInfrastructure` — registers all of the above;
+    needs `ConnectionStrings:Default`.
 - `src/MeetingRoomBooking.Api` — controllers, `Program.cs`, middleware.
   Controllers stay thin and only call Application services.
 - `tests/MeetingRoomBooking.Tests` — xUnit tests, including the concurrency
@@ -71,16 +88,24 @@ Infrastructure ──┘        (implements Application's interfaces)
 ## Design decisions (already made — don't change without asking)
 
 - **One row per 15-minute slot.** A booking for 10:00–11:00 is stored as four
-  `BookingSlot` rows with a unique index on `(ResourceId, SlotStartUtc)`,
-  inserted in one transaction: either every slot is taken or none is. This
+  `BookingSlot` rows whose primary key is `(ResourceId, SlotStartUtc)`
+  (`PK_BookingSlots`, clustered), inserted in one transaction: either every
+  slot is taken or none is. This
   blocks overlapping bookings at the database level, not only identical
   start times. Slots are inserted in ascending time order so concurrent
   overlapping inserts queue on the first shared slot instead of deadlocking.
-- **Concurrency control = that unique index.** The database rejects the
+- **Concurrency control = that primary key.** The database rejects the
   losing insert. The single commit point (`IUnitOfWork.CompleteAsync`)
   translates *only* a unique-constraint violation into a conflict; every
   other DB error propagates as a real error. Never catch `DbUpdateException`
   broadly — that hides real failures as fake "conflicts".
+- **Resource edits use optimistic concurrency.** A `Version` shadow property
+  (Guid, `IsConcurrencyToken`) is re-stamped on every save by
+  `AppDbContext`, so a stale edit fails instead of silently overwriting
+  another admin's change. Deliberately an app-generated Guid rather than SQL
+  Server `rowversion`: same technique, but identical on SQL Server and on the
+  SQLite test database. Bookings need no version: they are only inserted
+  (protected by the primary key) and deleted, never edited.
 - **Every instant is UTC; each resource has its own time zone.** Resources
   may be in different countries. Opening hours are local wall-clock times in
   the resource's IANA `TimeZoneId` (Windows ids are converted to IANA);
@@ -103,10 +128,14 @@ Infrastructure ──┘        (implements Application's interfaces)
 
 ## Not built yet
 
-Persistence (EF Core, the unique `(ResourceId, SlotStartUtc)` constraint,
-migrations), booking service, concurrency test, auth, API endpoints,
-SignalR, Angular client, Azure deployment. The Domain layer and its unit
-tests exist; nothing else does yet.
+API wiring and migrations, booking service, concurrency test, auth, API
+endpoints, SignalR, Angular client, Azure deployment. What exists: the Domain
+layer, the persistence layer (EF Core model, unit of work, repositories) and
+their tests on SQLite.
+
+Known gap: `SqlServerUniqueConstraintViolationDetector` (error numbers
+2627/2601) is not covered by an automated test — all tests run on SQLite. It
+needs a test against a real SQL Server before relying on it.
 
 ## Working conventions
 
