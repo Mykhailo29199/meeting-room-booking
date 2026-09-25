@@ -239,9 +239,8 @@ Infrastructure ──┘        (implements Application's interfaces)
 
 ## Not built yet
 
-The Angular client, Azure deployment (incl. CORS for the client's origin),
-and the README section that explains the concurrency design to the reviewer.
-What exists: the whole backend — Domain, persistence (migrations
+The Angular client and Azure deployment (incl. CORS for the client's
+origin). What exists: the whole backend — Domain, persistence (migrations
 `InitialCreate` and `AddIdentity`), the REST API (auth, resources and
 schedules, bookings) with exception-to-HTTP mapping and Swagger UI, real-time
 updates over SignalR (task item 7), the concurrency test (task item 6), and
@@ -300,6 +299,11 @@ their tests.
   git-ignored; committed `*.example.json` templates document required keys.
 - Persistence goes through `IUnitOfWork`; only `UnitOfWork.CompleteAsync`
   calls `SaveChangesAsync`.
+- README "How double booking is prevented" is the reviewer-facing
+  explanation of the concurrency design (task item 5 asks for an explained
+  decision). Any change to booking, the slot key, conflict translation or
+  locking must update it in the same commit, and its claims must match the
+  code and the tests.
 - Before trusting a new test, prove it can fail: break the code it guards,
   watch it go red, restore. Then rebuild with `--no-incremental` — a restored
   file can keep an old timestamp and leave a stale build behind.

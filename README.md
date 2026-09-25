@@ -6,6 +6,84 @@ Concurrency-safe meeting room booking with real-time schedule updates
 Work in progress — see `CLAUDE.md` for the architecture, design decisions and
 what is built so far.
 
+## How double booking is prevented
+
+**The requirement.** When several requests for the same slot arrive at
+effectively the same time, exactly one succeeds and the others get a clear
+conflict response — never a silent overwrite, never a server error.
+
+**The mechanism: the database's primary key on individual slots.**
+
+- A booking is one or more consecutive 15-minute slots. Besides the
+  `Bookings` row, every slot it occupies is stored as a row in
+  `BookingSlots`, whose **primary key is `(ResourceId, SlotStartUtc)`**
+  ([`BookingSlotConfiguration`](src/MeetingRoomBooking.Infrastructure/Persistence/Configurations/BookingSlotConfiguration.cs)).
+  A booking for 10:00–11:00 owns the rows 10:00, 10:15, 10:30 and 10:45.
+- Creating a booking inserts the booking and all its slot rows in **one
+  transaction**. The database accepts the insert only if none of those
+  primary-key values exists yet. Of several racing requests, the first to
+  commit wins; every other one fails with a duplicate-key error (SQL Server
+  2627) and its whole transaction is rolled back — no partial booking.
+- There is **no "check if free, then insert" step** that could race: the
+  code never asks whether a slot is free before booking it. The database
+  decides, atomically, at insert time.
+- Only that error becomes a conflict:
+  [`UnitOfWork`](src/MeetingRoomBooking.Infrastructure/Persistence/UnitOfWork.cs)
+  recognises exactly the unique-key violation and turns it into
+  `UniqueConstraintViolationException`;
+  [`BookingService`](src/MeetingRoomBooking.Application/Bookings/BookingService.cs)
+  turns that into `ConflictException`, which the API returns as **409** with
+  a readable message. Any other database error is not caught and stays a
+  real error, so a genuine failure is never disguised as "someone else was
+  faster".
+
+**Why slots, not one row per booking.** Bookings are ranges. A unique index on
+the booking's start time alone would reject two bookings starting at 10:00,
+but accept 10:00–11:00 and 10:15–10:30 together. SQL Server has no
+constraint for "ranges must not overlap". Splitting a booking into slots
+turns "no overlap" into "no duplicate key", which a primary key enforces:
+any two overlapping bookings share at least one slot.
+
+**Why not the alternatives.**
+
+| Approach | Why not here |
+|---|---|
+| Check if free, then insert | Two requests both see "free" and both insert. Explicitly ruled out by the task. |
+| Transactional locking (`SERIALIZABLE` / `UPDLOCK, HOLDLOCK` + overlap query) | Correct if every detail is right, but relies on subtle, database-specific range-lock behaviour; the key constraint gives the same guarantee declaratively. |
+| Optimistic concurrency with a version column (`rowversion`) | Protects *updates* of an existing row. A free slot has no row to version; it would require pre-creating a row for every slot of every resource for every future day. |
+| Unique index on the booking's start time | Misses overlapping ranges (see above). |
+
+**No deadlocks between racing bookings.** The primary key is clustered, so
+slot rows are stored in time order and every booking inserts its slots in
+ascending order: overlapping transactions wait on the first shared slot
+instead of locking in opposite orders.
+
+**Removing a resource while someone books it.** Admins can remove a resource;
+this cancels its future bookings in one transaction. So that no active
+booking of a removed resource can survive a race, booking and removal both
+start their transaction by taking an exclusive lock on the resource's row
+(a no-op `UPDATE`,
+[`ResourceRepository.LockAsync`](src/MeetingRoomBooking.Infrastructure/Persistence/Repositories/ResourceRepository.cs)).
+Whichever gets it first finishes before the other reads. The cost is that
+bookings of the *same* resource run one after another for a few
+milliseconds each; different resources never wait for each other. Which
+request wins a slot is still decided by the primary key.
+
+**Editing a resource.** Two admins editing the same resource at once must not
+overwrite each other. Resources carry a version token (a `Guid`, renewed on
+every save): an update is written only if the stored version still equals
+the one the admin loaded, otherwise it is a 409. It is an application-managed
+`Guid` rather than SQL Server's `rowversion` so that it behaves identically
+on SQL Server and on the SQLite database the tests run against.
+
+**How it is proven.** The [concurrency test](#the-concurrency-test) races 20
+simultaneous HTTP requests for the same slot — and 20 overlapping ranges —
+and checks for exactly one booking; race tests force both orders of a
+booking and a removal. The primary key, the narrow conflict translation, the
+resource-row lock and the version check are each covered by a test that
+fails when that guard is removed (the lock by the SQL Server run, since
+SQLite serialises writes anyway).
+
 ## Prerequisites
 - .NET 10 SDK
 - SQL Server (any edition, including Express or LocalDB) to run the API
