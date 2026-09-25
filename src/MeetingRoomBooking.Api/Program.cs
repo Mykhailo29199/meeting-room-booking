@@ -106,7 +106,13 @@ if (!app.Environment.IsProduction())
     });
 }
 
-app.UseHttpsRedirection();
+// Not in Development: the Angular dev server proxies /api and /hubs to the
+// API's plain-HTTP port, and a redirect to the HTTPS port would send the
+// browser to another origin, where the request fails CORS.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
