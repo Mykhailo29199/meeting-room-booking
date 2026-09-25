@@ -1,0 +1,24 @@
+<mat-toolbar>
+  <a class="brand" routerLink="/">Meeting Room Booking</a>
+
+  @if (auth.user(); as user) {
+    <nav aria-label="Main">
+      <a mat-button routerLink="/resources" routerLinkActive="active" ariaCurrentWhenActive="page">
+        Resources
+      </a>
+    </nav>
+    <span class="spacer"></span>
+    <span class="user">
+      <mat-icon aria-hidden="true">account_circle</mat-icon>
+      {{ user.displayName }}
+      @if (auth.isAdmin()) {
+        <span class="role">(admin)</span>
+      }
+    </span>
+    <button mat-button type="button" (click)="signOut()">Sign out</button>
+  } @else {
+    <span class="spacer"></span>
+    <a mat-button routerLink="/login">Sign in</a>
+    <a mat-button routerLink="/register">Create account</a>
+  }
+</mat-toolbar>

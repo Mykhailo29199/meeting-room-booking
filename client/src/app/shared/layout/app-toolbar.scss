@@ -1,0 +1,30 @@
+mat-toolbar {
+  gap: 8px;
+  background: var(--mat-sys-surface-container);
+}
+
+.brand {
+  margin-right: 16px;
+  color: inherit;
+  font: var(--mat-sys-title-large);
+  text-decoration: none;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.user {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: var(--mat-sys-body-large);
+}
+
+.role {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.active {
+  background: var(--mat-sys-secondary-container);
+}

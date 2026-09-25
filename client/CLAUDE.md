@@ -177,9 +177,14 @@ Build the client in these steps, each a working, tested state. Update the
    and the returned counts, restore), `/admin/bookings` (filter by resource,
    include past, cancel any); loading, empty and error states.
 
-**Status:** step 1 is done — dev proxy, environments, `core/api/` (models,
-`AuthApi`, `ResourcesApi`, `BookingsApi`, `toApiError`) with tests. The app
-shell is still the generated placeholder; next is step 2.
+**Status:** steps 1–2 are done — dev proxy, environments, `core/api/`
+(models, HTTP clients, `toApiError`); `core/auth/` (`AuthService`, the
+interceptor, the guards, `safeReturnUrl`), the login and register pages
+(`shared/forms/showApiErrorOnForm` puts server field errors on the fields),
+and the shell with its toolbar (`shared/layout/`), all with tests.
+`/resources` is a placeholder page until step 3. The toolbar gets its admin
+links in step 6, with the pages they lead to; `isAdmin` and `adminGuard`
+exist already. Next is step 3.
 
 ## Quality bar
 
