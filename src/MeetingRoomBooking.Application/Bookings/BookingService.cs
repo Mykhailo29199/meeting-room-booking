@@ -31,19 +31,30 @@ public sealed class BookingService
     /// the others gets <see cref="ConflictException"/>, which the API returns
     /// as HTTP 409 — never an overwrite and never a server error.
     ///
-    /// The resource is loaded to validate the request (exists, active, open at
-    /// that time). If an admin deactivates it at the same moment, the booking
-    /// may still commit — which is fine: deactivation keeps existing bookings,
-    /// so the result equals booking a second before deactivation.
+    /// Consistency with removing the resource: before reading the resource,
+    /// the transaction takes the resource-row lock
+    /// (<see cref="IResourceRepository.LockAsync"/>) that removal takes too.
+    /// So the "is it active?" check and the insert happen with no removal in
+    /// between: either this booking commits first and the removal then
+    /// releases it, or the removal commits first and this request sees the
+    /// resource as inactive. There is never an active booking of a removed
+    /// resource. The price: bookings of the same resource run one after
+    /// another (each holds the lock for milliseconds); different resources do
+    /// not wait for each other. The lock is only about removal — which slot
+    /// wins is still decided by the primary key.
     /// </summary>
     /// <exception cref="NotFoundException">The resource does not exist.</exception>
-    /// <exception cref="DomainException">The request breaks a business rule.</exception>
+    /// <exception cref="DomainException">The request breaks a business rule (e.g. the resource was removed).</exception>
     /// <exception cref="ConflictException">A slot was taken by another request.</exception>
     public async Task<BookingDto> CreateAsync(
         CreateBookingRequest request, UserContext user, CancellationToken cancellationToken = default)
     {
-        var resource = await _unitOfWork.Resources.GetByIdAsync(request.ResourceId, cancellationToken)
-            ?? throw new NotFoundException("The resource does not exist.");
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
+
+        if (!await _unitOfWork.Resources.LockAsync(request.ResourceId, cancellationToken))
+            throw new NotFoundException("The resource does not exist.");
+        // Read after the lock: this is the resource's current state.
+        var resource = (await _unitOfWork.Resources.GetByIdAsync(request.ResourceId, cancellationToken))!;
 
         var booking = Booking.Create(
             resource, user.UserId, request.StartUtc, request.EndUtc, _time.GetUtcNow().UtcDateTime);
@@ -59,6 +70,7 @@ public sealed class BookingService
                 "Sorry, someone else has just booked this time. Please pick another slot.", ex);
         }
 
+        await transaction.CommitAsync(cancellationToken);
         return ToDto(booking);
     }
 

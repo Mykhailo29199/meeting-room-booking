@@ -25,6 +25,9 @@ public sealed class UnitOfWork : IUnitOfWork
 
     public IBookingRepository Bookings { get; }
 
+    public async Task<ITransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+        new EfTransaction(await _context.Database.BeginTransactionAsync(cancellationToken));
+
     public async Task CompleteAsync(CancellationToken cancellationToken = default)
     {
         try

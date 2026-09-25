@@ -12,6 +12,12 @@ public interface IUnitOfWork
 
     IBookingRepository Bookings { get; }
 
+    /// <summary>
+    /// Starts an explicit transaction. Until it is committed, every
+    /// <see cref="CompleteAsync"/> call and every lock taken belongs to it.
+    /// </summary>
+    Task<ITransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
+
     /// <summary>Commits every staged change atomically: all of it is saved, or none of it.</summary>
     /// <exception cref="UniqueConstraintViolationException">
     /// A row violates a unique constraint — for bookings, one of the slots is already taken.

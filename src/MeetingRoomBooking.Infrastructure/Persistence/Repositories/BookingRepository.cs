@@ -14,6 +14,13 @@ internal sealed class BookingRepository : IBookingRepository
     public async Task<Booking?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         await _context.Bookings.Include(b => b.Slots).SingleOrDefaultAsync(b => b.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyList<Booking>> GetUnfinishedByResourceAsync(
+        Guid resourceId, DateTime nowUtc, CancellationToken cancellationToken = default) =>
+        await _context.Bookings
+            .Include(b => b.Slots)
+            .Where(b => b.ResourceId == resourceId && b.EndUtc > nowUtc)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<BookedSlot>> GetBookedSlotsAsync(
         Guid resourceId, DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default) =>
         // Range scan on the clustered primary key (ResourceId, SlotStartUtc).

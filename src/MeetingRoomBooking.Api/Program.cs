@@ -1,6 +1,7 @@
 using MeetingRoomBooking.Api.Errors;
 using MeetingRoomBooking.Api.OpenApi;
 using MeetingRoomBooking.Application.Bookings;
+using MeetingRoomBooking.Application.Resources;
 using MeetingRoomBooking.Infrastructure;
 using MeetingRoomBooking.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -18,6 +19,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 // Use cases.
 builder.Services.AddScoped<BookingService>();
+builder.Services.AddScoped<ResourceService>();
 
 // Authentication: every request may carry "Authorization: Bearer <token>".
 // Validation uses the same Jwt options that JwtTokenService signs with.

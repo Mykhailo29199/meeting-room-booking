@@ -13,7 +13,7 @@ namespace MeetingRoomBooking.Tests.Infrastructure;
 /// named in-memory database, the way separate requests use separate pooled
 /// connections in production.
 /// </summary>
-internal sealed class SqliteTestDatabase : IAsyncDisposable
+internal sealed class SqliteTestDatabase : ITestDatabase, IAsyncDisposable
 {
     private readonly string _connectionString =
         $"Data Source=file:tests-{Guid.NewGuid():N}?mode=memory&cache=shared";
@@ -42,6 +42,8 @@ internal sealed class SqliteTestDatabase : IAsyncDisposable
 
     public static UnitOfWork CreateUnitOfWork(AppDbContext context) =>
         new(context, new SqliteUniqueConstraintViolationDetector());
+
+    public UnitOfWork NewUnitOfWork(AppDbContext context) => CreateUnitOfWork(context);
 
     public ValueTask DisposeAsync() => _keepAlive.DisposeAsync();
 }

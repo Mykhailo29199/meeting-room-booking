@@ -15,7 +15,7 @@ namespace MeetingRoomBooking.Tests.Infrastructure;
 /// <c>Server=localhost;Trusted_Connection=True;TrustServerCertificate=True</c>.
 /// Any database name in it is replaced with a unique one per test class.
 /// </summary>
-internal sealed class SqlServerTestDatabase : IAsyncDisposable
+internal sealed class SqlServerTestDatabase : ITestDatabase, IAsyncDisposable
 {
     public const string ConnectionStringVariable = "MEETINGROOMBOOKING_TEST_SQLSERVER";
 
@@ -34,8 +34,20 @@ internal sealed class SqlServerTestDatabase : IAsyncDisposable
         var database = new SqlServerTestDatabase(builder.ConnectionString);
         await using var context = database.CreateContext();
         await context.Database.MigrateAsync();
+
+        // Behave like Azure SQL, where READ_COMMITTED_SNAPSHOT is on by default:
+        // plain reads see the last committed version instead of waiting for
+        // locks. That is the setting under which a missing lock actually
+        // produces a race, so tests must not rely on SQL Server's on-premises
+        // default (reads that block) hiding it.
+#pragma warning disable EF1002 // The database name is generated above, not user input.
+        await context.Database.ExecuteSqlRawAsync(
+            $"ALTER DATABASE [{builder.InitialCatalog}] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE");
+#pragma warning restore EF1002
         return database;
     }
+
+    public UnitOfWork NewUnitOfWork(AppDbContext context) => CreateUnitOfWork(context);
 
     public AppDbContext CreateContext() =>
         new(new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(_connectionString).Options);

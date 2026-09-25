@@ -195,6 +195,18 @@ public class BookingTests
     }
 
     [Theory]
+    [InlineData(9, 0, true)]    // not started
+    [InlineData(10, 30, true)]  // under way, 10:45 still ahead
+    [InlineData(10, 50, false)] // only the slot in progress is left
+    [InlineData(11, 0, false)]  // over
+    public void HasSlotsToRelease_tells_whether_release_would_free_anything(int nowH, int nowM, bool expected)
+    {
+        var booking = Booking.Create(OpenResource(), "user-1", Berlin(10, 0), Berlin(11, 0), NowUtc);
+
+        Assert.Equal(expected, booking.HasSlotsToRelease(Berlin(nowH, nowM)));
+    }
+
+    [Theory]
     [InlineData(10, 50)] // only the last slot (10:45–11:00) is left, and it is in progress
     [InlineData(11, 0)]  // exactly at the end
     [InlineData(12, 0)]  // long over

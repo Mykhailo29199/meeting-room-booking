@@ -70,6 +70,18 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         return (await response.Content.ReadFromJsonAsync<AuthResult>())!;
     }
 
+    /// <summary>An HTTP client signed in as the seeded admin.</summary>
+    public async Task<HttpClient> CreateAdminClientAsync()
+    {
+        var response = await CreateClient().PostAsJsonAsync("/api/auth/login", new LoginRequest(AdminEmail, AdminPassword));
+        response.EnsureSuccessStatusCode();
+        var result = (await response.Content.ReadFromJsonAsync<AuthResult>())!;
+        return CreateClient(result.AccessToken);
+    }
+
+    /// <summary>An HTTP client signed in as a newly registered regular user.</summary>
+    public async Task<HttpClient> CreateUserClientAsync() => CreateClient((await RegisterAsync()).AccessToken);
+
     /// <summary>An HTTP client that sends <paramref name="accessToken"/> as a Bearer token.</summary>
     public HttpClient CreateClient(string accessToken)
     {

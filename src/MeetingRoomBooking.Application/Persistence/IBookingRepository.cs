@@ -9,6 +9,13 @@ public interface IBookingRepository
     Task<Booking?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Bookings of <paramref name="resourceId"/> that have not ended by
+    /// <paramref name="nowUtc"/>, with their slots, tracked for changes.
+    /// </summary>
+    Task<IReadOnlyList<Booking>> GetUnfinishedByResourceAsync(
+        Guid resourceId, DateTime nowUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Taken slots of <paramref name="resourceId"/> starting in
     /// [<paramref name="fromUtc"/>, <paramref name="toUtc"/>), in time order. Read-only.
     /// </summary>

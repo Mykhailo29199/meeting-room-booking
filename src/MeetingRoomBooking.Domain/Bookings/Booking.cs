@@ -94,6 +94,7 @@ public class Booking
     ///   <see cref="DomainException"/>.
     /// </summary>
     /// <remarks>Requires <see cref="Slots"/> to be loaded.</remarks>
+    /// <seealso cref="HasSlotsToRelease"/>
     public ReleaseOutcome Release(DateTime nowUtc)
     {
         EnsureUtc(nowUtc, nameof(nowUtc));
@@ -111,6 +112,16 @@ public class Booking
         _slots.RemoveAll(s => s.SlotStartUtc >= nowUtc);
         EndUtc = StartUtc + startedSlots * TimeSlots.Length;
         return ReleaseOutcome.Shortened;
+    }
+
+    /// <summary>
+    /// True if <see cref="Release"/> would free anything: at least one slot
+    /// has not started yet. Requires <see cref="Slots"/> to be loaded.
+    /// </summary>
+    public bool HasSlotsToRelease(DateTime nowUtc)
+    {
+        EnsureUtc(nowUtc, nameof(nowUtc));
+        return _slots.Any(s => s.SlotStartUtc >= nowUtc);
     }
 
     private static void EnsureUtc(DateTime value, string paramName)

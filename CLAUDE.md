@@ -65,11 +65,17 @@ Infrastructure ──┘        (implements Application's interfaces)
   - `Persistence/` — `IUnitOfWork` (single commit point), `IResourceRepository`,
     `IBookingRepository`, and the two exceptions a commit can raise:
     `UniqueConstraintViolationException` (slot taken → 409) and
-    `ConcurrencyConflictException` (stale edit → 409).
+    `ConcurrencyConflictException` (stale edit → 409). `ITransaction` /
+    `IUnitOfWork.BeginTransactionAsync` for use cases that must hold a lock
+    between reading and writing; `IResourceRepository.LockAsync` is that lock.
   - `Bookings/BookingService` — create, cancel, day schedule. Services are
     concrete classes registered in `Program.cs`; they get the caller as a
     `Common/UserContext(UserId, IsAdmin)` parameter and "now" from an
     injected `TimeProvider` (tests use `FixedTimeProvider`).
+  - `Resources/ResourceService` — list, get, create, update (with the
+    client's `Version`), remove, restore. Admin-only actions are restricted
+    by the controller (`[Authorize(Roles = Roles.Admin)]`), not re-checked
+    in the service.
   - `Common/Exceptions.cs` — use-case outcomes the API maps to HTTP:
     `NotFoundException` 404, `ForbiddenException` 403, `ConflictException`
     409. Domain rule violations stay `DomainException` → 400.
@@ -157,9 +163,34 @@ Infrastructure ──┘        (implements Application's interfaces)
   a slot becomes free only when released. A schedule shows
   every slot as free/booked/past but never reveals who booked someone else's
   slot (`BookingId` only on the viewer's own slots); admins get a separate
-  all-bookings view. A booking that commits at the same moment an admin
-  deactivates the resource is accepted on purpose: deactivation keeps
-  existing bookings, so it equals booking just before — no lock needed.
+  all-bookings view.
+- **Removing a resource** (`DELETE /api/resources/{id}`, the task's
+  "remove") never deletes rows: the resource is deactivated (hidden from
+  users, not bookable) and every slot of it that has not started is
+  released in the same transaction — future bookings are cancelled,
+  bookings under way are cut short, past bookings stay as history. An admin
+  can restore it; cancelled bookings do not come back. Admins see removed
+  resources, users get 404.
+- **Booking vs. removal: the resource-row lock.** Invariant: never an active
+  booking of a removed resource. Both `BookingService.CreateAsync` and
+  `ResourceService.RemoveAsync` open a transaction and first call
+  `IResourceRepository.LockAsync` — a no-op `UPDATE Resources SET IsActive =
+  IsActive` that takes an exclusive row lock until commit — and only then
+  read. Whoever locks first finishes before the other reads: a booking
+  committed first is released by the removal; a booking waiting behind a
+  removal sees the resource inactive (400). Both take the resource lock
+  before anything else, so they cannot deadlock. Cost: bookings of the same
+  resource run one after another (milliseconds each); different resources
+  never wait. The lock is only for removal consistency — which request wins
+  a slot is still decided by the `BookingSlots` primary key. Deliberately an
+  UPDATE, not a `SELECT ... WITH (UPDLOCK)`: portable across SQL Server and
+  SQLite, and it locks even under READ_COMMITTED_SNAPSHOT (Azure SQL's
+  default), where plain reads do not block. Don't remove either lock
+  call — `RemovalRaceTests` (SQL Server variant) fails without them.
+- **Editing a resource** requires the `Version` from the client's last read
+  (`UpdateResourceRequest.Version`); a stale version is a 409, never a silent
+  overwrite. Existing bookings are kept even if new opening hours no longer
+  cover them.
 - **Users never see UTC.** The API returns slots in UTC plus the resource's
   `TimeZoneId`; the frontend shows a schedule in the *resource's* local time,
   labelled (e.g. "Berlin time (UTC+2)"), and adds the viewer's own time as a
@@ -185,13 +216,14 @@ Infrastructure ──┘        (implements Application's interfaces)
 
 ## Not built yet
 
-Booking/schedule/resource endpoints, resource management and all-bookings
-admin use cases, the parallel-requests concurrency test, SignalR, Angular
-client, Azure deployment. What exists: the Domain layer, the persistence
-layer (EF Core model, unit of work, repositories, migrations `InitialCreate`
-and `AddIdentity`), the booking service (create, cancel, schedule),
-authentication (register, login, me, roles, admin seeding), the
-exception-to-HTTP mapping, Swagger UI, and their tests.
+Booking and schedule endpoints, "my bookings" and the admin's all-bookings
+view, the parallel-requests concurrency test, SignalR, Angular client,
+Azure deployment. What exists: the Domain layer, the persistence layer (EF
+Core model, unit of work, repositories, migrations `InitialCreate` and
+`AddIdentity`), the booking service (create, cancel, schedule), resource
+management with its endpoints (`/api/resources`), authentication (register,
+login, me, roles, admin seeding), the exception-to-HTTP mapping, Swagger UI,
+and their tests.
 
 ## Tests and databases
 
@@ -206,7 +238,13 @@ exception-to-HTTP mapping, Swagger UI, and their tests.
   SQL Server's duplicate-key error numbers and the migrations. They run only
   when `MEETINGROOMBOOKING_TEST_SQLSERVER` holds a server connection string;
   otherwise they are reported as skipped. Each test class creates and drops
-  its own `MeetingRoomBookingTests_<guid>` database by applying the migrations.
+  its own `MeetingRoomBookingTests_<guid>` database by applying the migrations,
+  then switches on READ_COMMITTED_SNAPSHOT to behave like Azure SQL.
+- Race tests (`RemovalRaceTests`) force an interleaving: hold one side's
+  transaction open, start the other, assert it waits, then commit. Only the
+  SQL Server variants can catch a missing lock: SQLite's shared-cache reads
+  block on uncommitted writes anyway, so there the race cannot happen. Run
+  the SQL Server tests before relying on any change to locking.
 - Local dev database: `MeetingRoomBookingDb` on `MMU\MSSQLSERVER01`. Never
   modify or drop any other database on that server.
 - After changing the EF model, add a migration (command below) and check that
