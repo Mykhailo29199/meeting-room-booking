@@ -177,14 +177,18 @@ Build the client in these steps, each a working, tested state. Update the
    and the returned counts, restore), `/admin/bookings` (filter by resource,
    include past, cancel any); loading, empty and error states.
 
-**Status:** steps 1–2 are done — dev proxy, environments, `core/api/`
+**Status:** steps 1–3 are done — dev proxy, environments, `core/api/`
 (models, HTTP clients, `toApiError`); `core/auth/` (`AuthService`, the
 interceptor, the guards, `safeReturnUrl`), the login and register pages
 (`shared/forms/showApiErrorOnForm` puts server field errors on the fields),
-and the shell with its toolbar (`shared/layout/`), all with tests.
-`/resources` is a placeholder page until step 3. The toolbar gets its admin
-links in step 6, with the pages they lead to; `isAdmin` and `adminGuard`
-exist already. Next is step 3.
+and the shell with its toolbar (`shared/layout/`); `core/time/`
+(`resource-time`: times, zone labels and "your time" hints in a given zone;
+`local-date`: day arithmetic and date-picker values; `VIEWER_TIME_ZONE`),
+`/resources` (the list) and `/resources/:id?date=` (`SchedulePage`, route
+parameters bound as inputs; slot states in `slot-status`), all with tests.
+The schedule is read-only until step 4. The toolbar gets its admin links in
+step 6, with the pages they lead to; `isAdmin` and `adminGuard` exist
+already. Next is step 4.
 
 ## Quality bar
 

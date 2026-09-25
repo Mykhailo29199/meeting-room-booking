@@ -25,5 +25,12 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/resources/resource-list-page').then((m) => m.ResourceListPage),
   },
+  {
+    // Bookmarkable day: /resources/<id>?date=YYYY-MM-DD (no date = today there).
+    path: 'resources/:id',
+    title: `Schedule · ${appName}`,
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/schedule/schedule-page').then((m) => m.SchedulePage),
+  },
   { path: '**', redirectTo: 'resources' },
 ];

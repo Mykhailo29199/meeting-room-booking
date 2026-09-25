@@ -1,0 +1,82 @@
+<a mat-button routerLink="/resources" class="back">
+  <mat-icon aria-hidden="true">arrow_back</mat-icon>
+  All resources
+</a>
+
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Loading the schedule" />
+}
+
+@if (error(); as error) {
+  <div class="error" role="alert">
+    @if (error.status === 404) {
+      <p>This resource no longer exists.</p>
+    } @else {
+      <p>{{ error.message }}</p>
+      <button mat-stroked-button type="button" (click)="retry()">Try again</button>
+    }
+  </div>
+} @else if (view(); as view) {
+  <h1>{{ view.name }}</h1>
+
+  @if (!view.isActive) {
+    <p class="removed">This resource has been removed and cannot be booked.</p>
+  }
+
+  <div class="day-nav">
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Previous day"
+      (click)="showDay(view.previousDay)"
+    >
+      <mat-icon aria-hidden="true">chevron_left</mat-icon>
+    </button>
+    <mat-form-field subscriptSizing="dynamic">
+      <mat-label>Date</mat-label>
+      <input
+        matInput
+        [matDatepicker]="picker"
+        [value]="view.pickerDate"
+        (dateChange)="pickDay($event.value)"
+      />
+      <mat-datepicker-toggle matIconSuffix [for]="picker" />
+      <mat-datepicker #picker />
+    </mat-form-field>
+    <button mat-icon-button type="button" aria-label="Next day" (click)="showDay(view.nextDay)">
+      <mat-icon aria-hidden="true">chevron_right</mat-icon>
+    </button>
+    <button mat-stroked-button type="button" [disabled]="view.isToday" (click)="showDay(null)">
+      Today
+    </button>
+  </div>
+
+  <h2>{{ view.longDate }}</h2>
+  <p class="zone">
+    Times are {{ view.zone }}.
+    @if (view.viewerZone; as viewerZone) {
+      Your own time ({{ viewerZone }}) is shown in brackets.
+    }
+  </p>
+
+  @if (view.slots.length === 0) {
+    <p class="empty">There are no slots on this day.</p>
+  } @else {
+    <ol class="slots" [attr.aria-label]="'Slots on ' + view.longDate">
+      @for (slot of view.slots; track slot.key) {
+        <li class="slot" [attr.data-status]="slot.status">
+          <span class="time">
+            {{ slot.time }}
+            @if (slot.viewerTime) {
+              <span class="viewer-time">({{ slot.viewerTime }})</span>
+            }
+          </span>
+          <span class="status">
+            <mat-icon aria-hidden="true">{{ slot.icon }}</mat-icon>
+            {{ slot.label }}
+          </span>
+        </li>
+      }
+    </ol>
+  }
+}

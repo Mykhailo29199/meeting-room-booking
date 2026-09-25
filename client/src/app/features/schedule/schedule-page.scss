@@ -1,0 +1,100 @@
+:host {
+  display: block;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.back {
+  margin-bottom: 8px;
+}
+
+h1 {
+  margin: 8px 0;
+  font: var(--mat-sys-headline-small);
+}
+
+h2 {
+  margin: 16px 0 4px;
+  font: var(--mat-sys-title-medium);
+}
+
+.removed,
+.error p {
+  color: var(--mat-sys-error);
+}
+
+.day-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.zone,
+.empty {
+  margin: 0 0 16px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.slots {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Every status also has an icon and a label: colour is never the only cue.
+.slot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px 16px;
+  margin-bottom: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border-left: 4px solid transparent;
+  background: var(--mat-sys-surface-container-low);
+
+  &[data-status='free'] {
+    border-left-color: var(--mat-sys-primary);
+  }
+
+  &[data-status='booked'] {
+    background: var(--mat-sys-surface-container-highest);
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  &[data-status='mine'] {
+    border-left-color: var(--mat-sys-tertiary);
+    background: var(--mat-sys-tertiary-container);
+    color: var(--mat-sys-on-tertiary-container);
+  }
+
+  &[data-status='past'] {
+    color: var(--mat-sys-on-surface-variant);
+    opacity: 0.7;
+  }
+}
+
+.time {
+  font: var(--mat-sys-title-small);
+}
+
+.viewer-time {
+  font: var(--mat-sys-body-small);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: var(--mat-sys-body-medium);
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
