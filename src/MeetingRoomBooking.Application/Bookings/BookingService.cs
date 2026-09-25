@@ -7,17 +7,20 @@ namespace MeetingRoomBooking.Application.Bookings;
 
 /// <summary>
 /// Booking use cases: book a time range, cancel a booking, show a resource's
-/// schedule for a day.
+/// schedule for a day. Every committed change to slots is announced to the
+/// resource's viewers through <see cref="IScheduleNotifier"/>.
 /// </summary>
 public sealed class BookingService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly TimeProvider _time;
+    private readonly IScheduleNotifier _notifier;
 
-    public BookingService(IUnitOfWork unitOfWork, TimeProvider time)
+    public BookingService(IUnitOfWork unitOfWork, TimeProvider time, IScheduleNotifier notifier)
     {
         _unitOfWork = unitOfWork;
         _time = time;
+        _notifier = notifier;
     }
 
     /// <summary>
@@ -74,6 +77,10 @@ public sealed class BookingService
         }
 
         await transaction.CommitAsync(cancellationToken);
+
+        // After the commit, and only for the winner: a request that lost the
+        // race threw above and announces nothing.
+        await _notifier.SlotsChangedAsync(booking.ResourceId, SlotChanges.Of(booking.Slots, isBooked: true));
         return ToDto(booking);
     }
 
@@ -95,7 +102,11 @@ public sealed class BookingService
         if (booking.UserId != user.UserId && !user.IsAdmin)
             throw new ForbiddenException("You can only cancel your own bookings.");
 
-        var outcome = booking.Release(_time.GetUtcNow().UtcDateTime);
+        var nowUtc = _time.GetUtcNow().UtcDateTime;
+        // Exactly the slots Release frees: every one that has not started.
+        var freed = SlotChanges.Of(booking.Slots.Where(s => s.SlotStartUtc >= nowUtc), isBooked: false);
+
+        var outcome = booking.Release(nowUtc);
         if (outcome == ReleaseOutcome.Cancelled)
         {
             _unitOfWork.Bookings.Remove(booking);
@@ -104,6 +115,7 @@ public sealed class BookingService
         // are deleted, together with the new EndUtc, in the same commit.
 
         await _unitOfWork.CompleteAsync(cancellationToken);
+        await _notifier.SlotsChangedAsync(booking.ResourceId, freed);
         return outcome == ReleaseOutcome.Cancelled
             ? new CancellationResult(CancelledCompletely: true, RemainingBooking: null)
             : new CancellationResult(CancelledCompletely: false, RemainingBooking: ToDto(booking));

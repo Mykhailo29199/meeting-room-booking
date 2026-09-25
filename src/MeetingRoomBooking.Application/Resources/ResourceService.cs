@@ -1,3 +1,4 @@
+using MeetingRoomBooking.Application.Bookings;
 using MeetingRoomBooking.Application.Common;
 using MeetingRoomBooking.Application.Persistence;
 using MeetingRoomBooking.Domain;
@@ -18,11 +19,13 @@ public sealed class ResourceService
 
     private readonly IUnitOfWork _unitOfWork;
     private readonly TimeProvider _time;
+    private readonly IScheduleNotifier _notifier;
 
-    public ResourceService(IUnitOfWork unitOfWork, TimeProvider time)
+    public ResourceService(IUnitOfWork unitOfWork, TimeProvider time, IScheduleNotifier notifier)
     {
         _unitOfWork = unitOfWork;
         _time = time;
+        _notifier = notifier;
     }
 
     /// <summary>Users see the resources they can book; admins also see removed ones.</summary>
@@ -97,11 +100,13 @@ public sealed class ResourceService
         resource.Deactivate();
 
         int cancelled = 0, shortened = 0;
+        var freedSlots = new List<BookingSlot>();
         foreach (var booking in await _unitOfWork.Bookings.GetUnfinishedByResourceAsync(id, nowUtc, cancellationToken))
         {
             if (!booking.HasSlotsToRelease(nowUtc))
                 continue; // only the slot in progress is left
 
+            freedSlots.AddRange(booking.Slots.Where(s => s.SlotStartUtc >= nowUtc));
             if (booking.Release(nowUtc) == ReleaseOutcome.Cancelled)
             {
                 _unitOfWork.Bookings.Remove(booking);
@@ -115,6 +120,9 @@ public sealed class ResourceService
 
         await SaveAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+
+        if (freedSlots.Count > 0)
+            await _notifier.SlotsChangedAsync(id, SlotChanges.Of(freedSlots, isBooked: false));
         return new ResourceRemovalResult(cancelled, shortened);
     }
 

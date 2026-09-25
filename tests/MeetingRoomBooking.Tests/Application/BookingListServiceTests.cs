@@ -35,7 +35,7 @@ public class BookingListServiceTests : IAsyncLifetime
     private async Task<Guid> BookAsync(Resource resource, UserContext user, int startHour, int endHour)
     {
         await using var context = _database.CreateContext();
-        var service = new BookingService(SqliteTestDatabase.CreateUnitOfWork(context), new FixedTimeProvider(DayBeforeUtc));
+        var service = new BookingService(SqliteTestDatabase.CreateUnitOfWork(context), new FixedTimeProvider(DayBeforeUtc), new RecordingScheduleNotifier());
         var booking = await service.CreateAsync(
             new CreateBookingRequest(resource.Id, Berlin(startHour, 0), Berlin(endHour, 0)), user);
         return booking.Id;

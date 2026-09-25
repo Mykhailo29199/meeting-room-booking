@@ -75,7 +75,7 @@ public class RemovalRaceTests
         var removal = Task.Run(async () =>
         {
             await using var context = database.CreateContext();
-            var service = new ResourceService(database.NewUnitOfWork(context), new FixedTimeProvider(NowUtc));
+            var service = new ResourceService(database.NewUnitOfWork(context), new FixedTimeProvider(NowUtc), new RecordingScheduleNotifier());
             return await service.RemoveAsync(resourceId);
         });
 
@@ -107,7 +107,7 @@ public class RemovalRaceTests
         var booking = Task.Run(async () =>
         {
             await using var context = database.CreateContext();
-            var service = new BookingService(database.NewUnitOfWork(context), new FixedTimeProvider(NowUtc));
+            var service = new BookingService(database.NewUnitOfWork(context), new FixedTimeProvider(NowUtc), new RecordingScheduleNotifier());
             return await service.CreateAsync(
                 new CreateBookingRequest(resourceId, Berlin(10, 0), Berlin(11, 0)), new UserContext("alice", false));
         });

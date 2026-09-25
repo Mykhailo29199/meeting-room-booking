@@ -1,5 +1,6 @@
 using MeetingRoomBooking.Api.Errors;
 using MeetingRoomBooking.Api.OpenApi;
+using MeetingRoomBooking.Api.Realtime;
 using MeetingRoomBooking.Application.Bookings;
 using MeetingRoomBooking.Application.Resources;
 using MeetingRoomBooking.Infrastructure;
@@ -44,8 +45,30 @@ builder.Services
             RoleClaimType = JwtTokenService.RoleClaim,
             ClockSkew = TimeSpan.FromSeconds(30)
         };
+        // Browsers cannot set the Authorization header on a WebSocket, so the
+        // SignalR client sends the token as ?access_token=... — accepted on the
+        // hub path only, never on the REST API.
+        bearer.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var token = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(token) && context.HttpContext.Request.Path.StartsWithSegments(ScheduleHub.Path))
+                    context.Token = token;
+                return Task.CompletedTask;
+            }
+        };
     });
 builder.Services.AddAuthorization();
+
+// Real-time schedule updates (task item 7). With Azure:SignalR:ConnectionString
+// set (in Azure), connections go through Azure SignalR Service; without it
+// (locally, in tests) the app hosts SignalR itself — same hub, same code.
+var signalR = builder.Services.AddSignalR();
+var azureSignalR = builder.Configuration["Azure:SignalR:ConnectionString"];
+if (!string.IsNullOrWhiteSpace(azureSignalR))
+    signalR.AddAzureSignalR(azureSignalR);
+builder.Services.AddSingleton<IScheduleNotifier, SignalRScheduleNotifier>();
 
 builder.Services.AddControllers();
 
@@ -89,6 +112,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ScheduleHub>(ScheduleHub.Path);
 
 app.Run();
 

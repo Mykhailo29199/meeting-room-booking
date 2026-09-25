@@ -18,6 +18,7 @@ public class BookingServiceTests : IAsyncLifetime
     private static readonly UserContext Admin = new("admin", IsAdmin: true);
 
     private SqliteTestDatabase _database = null!;
+    private readonly RecordingScheduleNotifier _notifier = new();
     private Resource _resource = null!;
 
     public async Task InitializeAsync()
@@ -43,7 +44,7 @@ public class BookingServiceTests : IAsyncLifetime
     {
         await using var context = _database.CreateContext();
         var service = new BookingService(
-            SqliteTestDatabase.CreateUnitOfWork(context), new FixedTimeProvider(nowUtc ?? DayBeforeUtc));
+            SqliteTestDatabase.CreateUnitOfWork(context), new FixedTimeProvider(nowUtc ?? DayBeforeUtc), _notifier);
         return await action(service);
     }
 
@@ -184,6 +185,52 @@ public class BookingServiceTests : IAsyncLifetime
         await Assert.ThrowsAsync<DomainException>(() =>
             AsRequest(s => s.CancelAsync(booking.Id, Alice), nowUtc: Berlin(12, 0)));
         Assert.Equal(4, await SlotCountAsync());
+    }
+
+    // ---- Real-time notifications (task item 7) ------------------------------
+
+    [Fact]
+    public async Task Booking_announces_its_slots_as_booked()
+    {
+        await BookAsync(Alice, Berlin(10, 0), Berlin(10, 30));
+
+        var (resourceId, slots) = Assert.Single(_notifier.Sent);
+        Assert.Equal(_resource.Id, resourceId);
+        Assert.Equal(
+            [new SlotChange(Berlin(10, 0), Berlin(10, 15), true), new SlotChange(Berlin(10, 15), Berlin(10, 30), true)],
+            slots);
+    }
+
+    [Fact]
+    public async Task Losing_a_race_announces_nothing()
+    {
+        await BookAsync(Alice, Berlin(10, 0), Berlin(11, 0));
+
+        await Assert.ThrowsAsync<ConflictException>(() => BookAsync(Bob, Berlin(10, 30), Berlin(11, 30)));
+
+        Assert.Single(_notifier.Sent); // Alice's booking only
+    }
+
+    [Fact]
+    public async Task Rejected_booking_announces_nothing()
+    {
+        await Assert.ThrowsAsync<DomainException>(() => BookAsync(Alice, Berlin(7, 0), Berlin(8, 0)));
+
+        Assert.Empty(_notifier.Sent);
+    }
+
+    [Fact]
+    public async Task Cancelling_announces_exactly_the_freed_slots_as_free()
+    {
+        var booking = await BookAsync(Alice, Berlin(10, 0), Berlin(11, 0));
+
+        await AsRequest(s => s.CancelAsync(booking.Id, Alice), nowUtc: Berlin(10, 20));
+
+        // 10:00 has passed and 10:15 is in progress: only 10:30 and 10:45 are freed.
+        var (_, freed) = _notifier.Sent[^1];
+        Assert.Equal(
+            [new SlotChange(Berlin(10, 30), Berlin(10, 45), false), new SlotChange(Berlin(10, 45), Berlin(11, 0), false)],
+            freed);
     }
 
     // ---- Schedule ----------------------------------------------------------

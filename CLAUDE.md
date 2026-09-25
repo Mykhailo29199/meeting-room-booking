@@ -33,7 +33,8 @@ Hard requirements that shape the code:
 - Backend: ASP.NET Core on .NET 10 (LTS; chosen over .NET 8, whose support
   ends in November 2026). Solution file: `MeetingRoomBooking.slnx`.
 - Database: SQL Server (Azure SQL in production).
-- Real-time: SignalR, Azure SignalR Service in production (planned).
+- Real-time: SignalR hub `/hubs/schedule`; Azure SignalR Service when
+  `Azure:SignalR:ConnectionString` is set, in-process SignalR otherwise.
 - Frontend: Angular in `client/` (planned).
 
 ## Architecture — 4 layers, dependencies point inward only
@@ -120,6 +121,19 @@ Infrastructure ──┘        (implements Application's interfaces)
     actions that must be public opt out with `[AllowAnonymous]`.
     `ControllerSecurityTests` enforces this for every controller and pins
     the list of anonymous actions — extend it deliberately when adding one.
+  - `Realtime/` — real-time schedule updates (task item 7). `ScheduleHub`
+    (`[Authorize]`) only manages groups: a client calls
+    `WatchResource(resourceId)` / `StopWatchingResource(resourceId)` and joins
+    `resource:{id}`. `SignalRScheduleNotifier` implements Application's
+    `IScheduleNotifier` and sends `SlotsChanged` =
+    `SlotsChangedMessage(resourceId, slots[{startUtc, endUtc, isBooked}])`
+    to that group. Services call it only **after** the commit (the loser of a
+    race sends nothing): `BookingService` on book (booked) and cancel (the
+    freed slots), `ResourceService.RemoveAsync` for every slot it frees.
+    Sending never throws (logged instead) and ignores the request's
+    cancellation token — the change is saved and other viewers must hear of
+    it. The message never says who booked. Browsers send the JWT as
+    `?access_token=`; `Program` accepts that on the hub path only.
   - OpenAPI: the built-in document (`/openapi/v1.json`) shown by Swagger UI at
     `/swagger`, both only outside Production for now (decide at deployment).
     `OpenApi/BearerSecurityTransformer` adds the Bearer scheme and marks
@@ -225,14 +239,13 @@ Infrastructure ──┘        (implements Application's interfaces)
 
 ## Not built yet
 
-SignalR real-time updates, the Angular client, Azure deployment, and the
-README section that explains the concurrency design to the reviewer. What
-exists: the concurrency test (task item 6), the Domain
-layer, persistence (EF Core model, unit of work, repositories, migrations
-`InitialCreate` and `AddIdentity`), the complete REST API — auth
-(`/api/auth`), resources and schedules (`/api/resources`), bookings
-(`/api/bookings`) — with exception-to-HTTP mapping and Swagger UI, and their
-tests.
+The Angular client, Azure deployment (incl. CORS for the client's origin),
+and the README section that explains the concurrency design to the reviewer.
+What exists: the whole backend — Domain, persistence (migrations
+`InitialCreate` and `AddIdentity`), the REST API (auth, resources and
+schedules, bookings) with exception-to-HTTP mapping and Swagger UI, real-time
+updates over SignalR (task item 7), the concurrency test (task item 6), and
+their tests.
 
 ## Tests and databases
 

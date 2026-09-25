@@ -18,6 +18,7 @@ public class ResourceServiceTests : IAsyncLifetime
     private static readonly UserContext Admin = new("admin", IsAdmin: true);
 
     private SqliteTestDatabase _database = null!;
+    private readonly RecordingScheduleNotifier _notifier = new();
 
     public async Task InitializeAsync() => _database = await SqliteTestDatabase.CreateAsync();
 
@@ -35,7 +36,7 @@ public class ResourceServiceTests : IAsyncLifetime
         await using var context = _database.CreateContext();
         var unitOfWork = SqliteTestDatabase.CreateUnitOfWork(context);
         var time = new FixedTimeProvider(nowUtc ?? DayBeforeUtc);
-        return await action(new ResourceService(unitOfWork, time), new BookingService(unitOfWork, time));
+        return await action(new ResourceService(unitOfWork, time, _notifier), new BookingService(unitOfWork, time, _notifier));
     }
 
     private Task<ResourceDto> CreateAsync(CreateResourceRequest? request = null) =>
@@ -148,6 +149,23 @@ public class ResourceServiceTests : IAsyncLifetime
         Assert.Equal(Berlin(10, 15), bookings[ongoing.Id].EndUtc); // slot in progress kept, rest freed
         Assert.Single(bookings[ongoing.Id].Slots);
         Assert.False(bookings.ContainsKey(future.Id));             // cancelled
+    }
+
+    [Fact]
+    public async Task Removal_announces_every_freed_slot_as_free()
+    {
+        var resource = await CreateAsync();
+        await BookAsync(resource.Id, Bob, Berlin(10, 0), Berlin(10, 30));
+        await BookAsync(resource.Id, Alice, Berlin(14, 0), Berlin(14, 15));
+        var sentBefore = _notifier.Sent.Count;
+
+        await AsRequest((resources, _) => resources.RemoveAsync(resource.Id), nowUtc: Berlin(10, 5));
+
+        var (resourceId, freed) = Assert.Single(_notifier.Sent.Skip(sentBefore));
+        Assert.Equal(resource.Id, resourceId);
+        // 10:00 is in progress and stays; 10:15 and 14:00 are freed.
+        Assert.Equal([Berlin(10, 15), Berlin(14, 0)], freed.Select(s => s.StartUtc));
+        Assert.All(freed, s => Assert.False(s.IsBooked));
     }
 
     [Fact]

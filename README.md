@@ -87,6 +87,19 @@ display.
 | `GET /api/bookings` | admin | all users' bookings |
 | `POST/PUT/DELETE /api/resources…`, `POST /api/resources/{id}/restore` | admin | create, edit, remove, restore resources |
 
+## Real-time updates
+Everyone viewing a resource's schedule sees bookings and cancellations
+immediately, without refreshing (SignalR; Azure SignalR Service in Azure).
+
+1. Connect to `/hubs/schedule` with the access token (browsers send it as
+   `?access_token=<token>`; the official SignalR client does this for you).
+2. Call `WatchResource(resourceId)` for the schedule on screen
+   (`StopWatchingResource` when leaving it).
+3. Handle `SlotsChanged`: `{ resourceId, slots: [{ startUtc, endUtc, isBooked }] }`
+   — mark those slots booked or free.
+
+Events are sent only after a change is saved, and never say who booked.
+
 ## Development with Claude Code
 This project is built with Claude Code as a pair programmer. I set the
 direction, make the design decisions, test the running application, review
