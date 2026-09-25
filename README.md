@@ -87,6 +87,7 @@ SQLite serialises writes anyway).
 ## Prerequisites
 - .NET 10 SDK
 - SQL Server (any edition, including Express or LocalDB) to run the API
+- Node.js 24.15+ (or 22.22.3+) for the Angular client in `client/`
 
 ## Build and test
 ```bash

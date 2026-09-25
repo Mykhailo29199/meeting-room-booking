@@ -35,7 +35,9 @@ Hard requirements that shape the code:
 - Database: SQL Server (Azure SQL in production).
 - Real-time: SignalR hub `/hubs/schedule`; Azure SignalR Service when
   `Azure:SignalR:ConnectionString` is set, in-process SignalR otherwise.
-- Frontend: Angular in `client/` (planned).
+- Frontend: Angular 22 + Angular Material in `client/` (standalone
+  components, SCSS, Vitest). Needs Node.js 22.22.3+ or 24.15+. UI language:
+  English (matches the API's messages).
 
 ## Architecture — 4 layers, dependencies point inward only
 
@@ -319,4 +321,10 @@ dotnet run --project src/MeetingRoomBooking.Api
 dotnet tool restore
 dotnet ef migrations add <Name> --project src/MeetingRoomBooking.Infrastructure --startup-project src/MeetingRoomBooking.Api --output-dir Persistence/Migrations
 dotnet ef database update --project src/MeetingRoomBooking.Infrastructure --startup-project src/MeetingRoomBooking.Api
+
+# Angular client (run inside client/)
+npm ci
+npx ng serve
+npx ng build
+npx ng test --watch=false
 ```
