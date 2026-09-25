@@ -1,59 +1,29 @@
-# BookingClient
+# Meeting Room Booking — client
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.0.
+The Angular frontend of the Meeting Room Booking System: Angular 22,
+Angular Material, Vitest. The backend, its API and the design behind both
+are described in the [repository README](../README.md).
 
-## Development server
+## Prerequisites
 
-To start a local development server, run:
+- Node.js 24.15+ (or 22.22.3+)
+- The API running locally on `http://localhost:5077`:
+  `dotnet run --project ../src/MeetingRoomBooking.Api` (or F5 in Visual Studio)
 
-```bash
-ng serve
-```
-
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## Run
 
 ```bash
-ng generate component component-name
+npm ci       # install exactly the versions package-lock.json pins
+npm start    # dev server on http://localhost:4200
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+The dev server forwards `/api` and `/hubs` (including WebSockets) to the
+API ([proxy.conf.json](proxy.conf.json)), so the browser talks to one
+origin and no CORS setup is needed locally.
+
+## Build and test
 
 ```bash
-ng generate --help
+npx ng build                # production build into dist/
+npx ng test --watch=false   # unit tests (Vitest)
 ```
-
-## Building
-
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
