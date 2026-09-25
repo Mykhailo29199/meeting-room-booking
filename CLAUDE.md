@@ -225,9 +225,9 @@ Infrastructure ──┘        (implements Application's interfaces)
 
 ## Not built yet
 
-The parallel-requests concurrency test (task item 6), SignalR real-time
-updates, the Angular client, Azure deployment, and the README section that
-explains the concurrency design to the reviewer. What exists: the Domain
+SignalR real-time updates, the Angular client, Azure deployment, and the
+README section that explains the concurrency design to the reviewer. What
+exists: the concurrency test (task item 6), the Domain
 layer, persistence (EF Core model, unit of work, repositories, migrations
 `InitialCreate` and `AddIdentity`), the complete REST API — auth
 (`/api/auth`), resources and schedules (`/api/resources`), bookings
@@ -238,11 +238,25 @@ tests.
 
 - Default `dotnet test` runs everything on SQLite — no setup, so a reviewer
   can run it anywhere.
-- HTTP-level tests use `tests/.../Api/ApiFactory` (`WebApplicationFactory`):
-  the real Program on SQLite, environment `Testing` (so the developer's
+- HTTP-level tests use `tests/.../Api/ApiFactory.cs` (`WebApplicationFactory`):
+  the real Program, environment `Testing` (so the developer's
   appsettings.Development.json is never read), a random test `Jwt:Key` and a
-  test admin. `ApiFactory.RegisterAsync()` / `CreateClient(token)` give a
-  signed-in client.
+  test admin. `ApiFactory` runs it on SQLite; `SqlServerApiFactory` runs it
+  unchanged on a migrated SQL Server test database (opt-in, only the
+  connection string differs). `RegisterAsync()`, `CreateAdminClientAsync()`,
+  `CreateUserClientAsync()` give signed-in clients; `Database` lets a test
+  check what was actually stored.
+- **The concurrency test (task item 6)** is `tests/.../Api/ConcurrencyTests.cs`:
+  20 users, released by one start signal, POST the same slots (and, in a
+  second scenario, different ranges sharing one slot) through the full HTTP
+  pipeline; asserts exactly one 201, 19 × 409, no 5xx, and exactly one
+  booking with its slots in the database; a third scenario repeats the race
+  five times. Same scenarios on SQLite (`ConcurrencyTests`, always) and SQL
+  Server (`SqlServerConcurrencyTests`, opt-in). On SQLite, which serialises
+  writes, they check the API contract; the SQL Server run is what exercises
+  the concurrency control — run it after any change to booking, locking or
+  the slot key. Keep this test green and meaningful — it is what the
+  reviewer runs.
 - `SqlServerPersistenceTests` (`[SqlServerFact]`) cover what SQLite cannot:
   SQL Server's duplicate-key error numbers and the migrations. They run only
   when `MEETINGROOMBOOKING_TEST_SQLSERVER` holds a server connection string;

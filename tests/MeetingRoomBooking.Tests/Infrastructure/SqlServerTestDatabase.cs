@@ -49,6 +49,8 @@ internal sealed class SqlServerTestDatabase : ITestDatabase, IAsyncDisposable
 
     public UnitOfWork NewUnitOfWork(AppDbContext context) => CreateUnitOfWork(context);
 
+    public string ConnectionString => _connectionString;
+
     public AppDbContext CreateContext() =>
         new(new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(_connectionString).Options);
 

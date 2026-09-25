@@ -24,6 +24,21 @@ dotnet test MeetingRoomBooking.slnx
 ```
 They create and drop their own temporary databases.
 
+### The concurrency test
+```bash
+dotnet test MeetingRoomBooking.slnx --filter "FullyQualifiedName~ConcurrencyTests"
+```
+20 users send a booking request for the same slot at the same moment,
+through the full HTTP API. The test asserts that exactly one request gets
+`201 Created`, the other 19 get `409 Conflict` (never a server error), and
+exactly one booking is stored. A second scenario sends 20 *different* time
+ranges that all share one slot — the case a unique index on the booking's
+start time alone would miss; a third repeats the race five times. With
+`MEETINGROOMBOOKING_TEST_SQLSERVER` set, the same scenarios also run on SQL
+Server (`SqlServerConcurrencyTests`). On SQLite, which serialises writes, the
+scenarios check the API contract; the SQL Server run is what exercises the
+concurrency control.
+
 ## Run the API locally
 1. Create your local settings from the template (the copy is git-ignored):
    ```bash

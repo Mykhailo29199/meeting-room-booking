@@ -17,48 +17,36 @@ namespace MeetingRoomBooking.Tests.Api;
 /// The real API — same Program, controllers, authentication and error
 /// handling — hosted in memory for HTTP-level tests.
 ///
-/// Differences from production, and only these: the database is SQLite (so
-/// the tests run anywhere; see <see cref="SqliteTestDatabase"/>), the JWT key
-/// and seeded admin come from test settings, and the "Testing" environment
-/// means the developer's appsettings.Development.json is never read.
+/// Differences from production, and only these: the database is a
+/// throw-away test database (see the two subclasses), the JWT key and seeded
+/// admin come from test settings, and the "Testing" environment means the
+/// developer's appsettings.Development.json is never read.
 /// </summary>
-public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public abstract class ApiFactoryBase : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string AdminEmail = "admin@test.local";
     public const string AdminPassword = "Admin#Test1";
 
-    private SqliteTestDatabase _database = null!;
+    /// <summary>The database the API runs on, for checking what it actually stored.</summary>
+    internal abstract ITestDatabase Database { get; }
 
     // The schema must exist before the app starts, because startup seeds roles.
-    public async Task InitializeAsync() => _database = await SqliteTestDatabase.CreateAsync();
+    public abstract Task InitializeAsync();
+
+    protected abstract ValueTask DisposeDatabaseAsync();
 
     async Task IAsyncLifetime.DisposeAsync()
     {
         await DisposeAsync();
-        await _database.DisposeAsync();
+        await DisposeDatabaseAsync();
     }
-
-    internal SqliteTestDatabase Database => _database;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-        builder.UseSetting("ConnectionStrings:Default", "replaced-by-sqlite-below");
         builder.UseSetting("Jwt:Key", $"test-signing-key-{Guid.NewGuid():N}");
         builder.UseSetting("Seed:AdminEmail", AdminEmail);
         builder.UseSetting("Seed:AdminPassword", AdminPassword);
-
-        builder.ConfigureTestServices(services =>
-        {
-            // Swap SQL Server for the test database (EF Core registers both the
-            // options and an options-configuration callback; replace both).
-            services.RemoveAll<DbContextOptions<AppDbContext>>();
-            services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
-            services.AddDbContext<AppDbContext>(options => options.UseSqlite(_database.ConnectionString));
-
-            services.RemoveAll<IUniqueConstraintViolationDetector>();
-            services.AddSingleton<IUniqueConstraintViolationDetector, SqliteUniqueConstraintViolationDetector>();
-        });
     }
 
     /// <summary>Registers a new user with a unique email and returns their sign-in result.</summary>
@@ -88,5 +76,71 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         var client = CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         return client;
+    }
+}
+
+/// <summary>
+/// The API on SQLite (see <see cref="SqliteTestDatabase"/>): no setup, so
+/// every HTTP-level test runs anywhere, including on the reviewer's machine.
+/// </summary>
+public sealed class ApiFactory : ApiFactoryBase
+{
+    private SqliteTestDatabase _database = null!;
+
+    internal override ITestDatabase Database => _database;
+
+    public override async Task InitializeAsync() => _database = await SqliteTestDatabase.CreateAsync();
+
+    protected override ValueTask DisposeDatabaseAsync() => _database.DisposeAsync();
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.UseSetting("ConnectionStrings:Default", "replaced-by-sqlite-below");
+
+        builder.ConfigureTestServices(services =>
+        {
+            // Swap SQL Server for the test database (EF Core registers both the
+            // options and an options-configuration callback; replace both).
+            services.RemoveAll<DbContextOptions<AppDbContext>>();
+            services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
+            services.AddDbContext<AppDbContext>(options => options.UseSqlite(_database.ConnectionString));
+
+            services.RemoveAll<IUniqueConstraintViolationDetector>();
+            services.AddSingleton<IUniqueConstraintViolationDetector, SqliteUniqueConstraintViolationDetector>();
+        });
+    }
+}
+
+/// <summary>
+/// The API exactly as in production — SQL Server provider, migrations,
+/// SQL Server error detection — on a throw-away database with
+/// READ_COMMITTED_SNAPSHOT like Azure SQL. Only the connection string differs.
+/// Opt-in: when <see cref="SqlServerTestDatabase.ConnectionStringVariable"/>
+/// is not set, no database is created and the [SqlServerFact] tests skip.
+/// </summary>
+public sealed class SqlServerApiFactory : ApiFactoryBase
+{
+    private SqlServerTestDatabase? _database;
+
+    internal override ITestDatabase Database => _database
+        ?? throw new InvalidOperationException("SQL Server tests are not configured.");
+
+    public override async Task InitializeAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(SqlServerTestDatabase.ServerConnectionString))
+            _database = await SqlServerTestDatabase.CreateAsync();
+    }
+
+    protected override async ValueTask DisposeDatabaseAsync()
+    {
+        if (_database is not null)
+            await _database.DisposeAsync();
+    }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.UseSetting("ConnectionStrings:Default", _database?.ConnectionString ?? "not-configured");
     }
 }
