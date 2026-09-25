@@ -1,10 +1,14 @@
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MatSelectHarness } from '@angular/material/select/testing';
 import { NavigationExtras, provideRouter, Router } from '@angular/router';
-import { Observable, of, throwError } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
 import type { MockInstance } from 'vitest';
-import { ResourceSchedule, Slot } from '../../core/api/models';
+import { BookingsApi } from '../../core/api/bookings-api';
+import { Booking, ResourceSchedule, Slot } from '../../core/api/models';
 import { ResourcesApi } from '../../core/api/resources-api';
+import { Notifier } from '../../core/notify/notifier';
 import { VIEWER_TIME_ZONE } from '../../core/time/viewer-time-zone';
 import { SchedulePage } from './schedule-page';
 
@@ -48,15 +52,23 @@ describe('SchedulePage', () => {
   let scheduleApi: ReturnType<typeof vi.fn>;
   let viewerTimeZone: string;
   let navigate: MockInstance<Router['navigate']>;
+  let bookingAnswer: Observable<Booking>;
+  let create: ReturnType<typeof vi.fn>;
+  let show: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     answers = [];
     scheduleApi = vi.fn(() => answers.shift() ?? of(schedule()));
+    bookingAnswer = of({} as Booking);
+    create = vi.fn(() => bookingAnswer);
+    show = vi.fn();
     viewerTimeZone = 'Europe/Berlin';
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         { provide: ResourcesApi, useValue: { schedule: scheduleApi } },
+        { provide: BookingsApi, useValue: { create } },
+        { provide: Notifier, useValue: { show } },
         { provide: VIEWER_TIME_ZONE, useFactory: () => viewerTimeZone },
       ],
     });
@@ -76,7 +88,7 @@ describe('SchedulePage', () => {
   }
 
   function slotRows(fixture: ComponentFixture<unknown>): HTMLElement[] {
-    return [...page(fixture).querySelectorAll<HTMLElement>('li.slot')];
+    return [...page(fixture).querySelectorAll<HTMLElement>('.slot')];
   }
 
   function button(fixture: ComponentFixture<unknown>, name: string): HTMLButtonElement {
@@ -217,5 +229,199 @@ describe('SchedulePage', () => {
     expect(page(fixture).textContent).toContain(
       'This resource has been removed and cannot be booked.',
     );
+  });
+
+  describe('booking', () => {
+    // Berlin 10:00, 10:15, 10:30 free | 10:45 booked | 11:00 free.
+    const freeDay = (): ResourceSchedule =>
+      schedule({
+        slots: [
+          slot('2026-10-01T08:00:00Z', '2026-10-01T08:15:00Z'),
+          slot('2026-10-01T08:15:00Z', '2026-10-01T08:30:00Z'),
+          slot('2026-10-01T08:30:00Z', '2026-10-01T08:45:00Z'),
+          slot('2026-10-01T08:45:00Z', '2026-10-01T09:00:00Z', { isBooked: true }),
+          slot('2026-10-01T09:00:00Z', '2026-10-01T09:15:00Z'),
+        ],
+      });
+
+    beforeEach(() => {
+      scheduleApi.mockImplementation(() => answers.shift() ?? of(freeDay()));
+    });
+
+    function slotButton(fixture: ComponentFixture<unknown>, time: string): HTMLButtonElement {
+      return slotRows(fixture).find((row) =>
+        row.querySelector('.time')?.textContent?.trim().startsWith(time),
+      ) as HTMLButtonElement;
+    }
+
+    async function click(fixture: ComponentFixture<unknown>, element: HTMLElement): Promise<void> {
+      element.click();
+      await fixture.whenStable();
+    }
+
+    function summary(fixture: ComponentFixture<unknown>): string {
+      return page(fixture).querySelector('.summary')?.textContent?.trim() ?? '';
+    }
+
+    function selectedTimes(fixture: ComponentFixture<unknown>): string[] {
+      return slotRows(fixture)
+        .filter((row) => row.getAttribute('aria-pressed') === 'true')
+        .map((row) => row.querySelector('.time')!.textContent!.trim());
+    }
+
+    it('chooses a range by clicking free slots', async () => {
+      const fixture = await render('2026-10-01');
+
+      await click(fixture, slotButton(fixture, '10:00'));
+      await click(fixture, slotButton(fixture, '10:30'));
+
+      expect(summary(fixture)).toBe('10:00–10:45, 45 min');
+      expect(selectedTimes(fixture)).toEqual(['10:00–10:15', '10:15–10:30', '10:30–10:45']);
+      expect(slotButton(fixture, '10:15').textContent).toContain('Selected');
+      expect(slotButton(fixture, '10:45').disabled).toBe(true);
+    });
+
+    it('offers only ends reachable through free slots', async () => {
+      const fixture = await render('2026-10-01');
+      const loader = TestbedHarnessEnvironment.loader(fixture);
+      const [start, end] = await loader.getAllHarnesses(MatSelectHarness);
+
+      await start.open();
+      await start.clickOptions({ text: '10:00' });
+      await end.open();
+      const ends = await Promise.all((await end.getOptions()).map((option) => option.getText()));
+      await end.clickOptions({ text: '10:30 (30 min)' });
+
+      expect(ends).toEqual(['10:15 (15 min)', '10:30 (30 min)', '10:45 (45 min)']);
+      expect(summary(fixture)).toBe('10:00–10:30, 30 min');
+    });
+
+    it("books exactly the schedule's UTC values, then reloads", async () => {
+      const fixture = await render('2026-10-01');
+      await click(fixture, slotButton(fixture, '10:00'));
+      await click(fixture, slotButton(fixture, '10:15'));
+
+      await click(fixture, button(fixture, 'Book'));
+
+      expect(create).toHaveBeenCalledExactlyOnceWith({
+        resourceId: 'r1',
+        startUtc: '2026-10-01T08:00:00Z',
+        endUtc: '2026-10-01T08:30:00Z',
+      });
+      expect(show).toHaveBeenCalledWith('Booked 10:00–10:30, 30 min.');
+      expect(scheduleApi).toHaveBeenCalledTimes(2);
+      expect(selectedTimes(fixture)).toEqual([]);
+    });
+
+    it('sends one request however often Book is pressed', async () => {
+      bookingAnswer = NEVER;
+      const fixture = await render('2026-10-01');
+      await click(fixture, slotButton(fixture, '10:00'));
+
+      await click(fixture, button(fixture, 'Book'));
+      await click(fixture, button(fixture, 'Book'));
+
+      expect(create).toHaveBeenCalledOnce();
+      expect(button(fixture, 'Book').disabled).toBe(true);
+    });
+
+    it('explains a conflict, reloads and clears the choice', async () => {
+      bookingAnswer = throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { detail: 'This time has just been booked by someone else.' },
+          }),
+      );
+      const fixture = await render('2026-10-01');
+      await click(fixture, slotButton(fixture, '10:00'));
+
+      await click(fixture, button(fixture, 'Book'));
+
+      expect(show).toHaveBeenCalledWith('This time has just been booked by someone else.');
+      expect(scheduleApi).toHaveBeenCalledTimes(2);
+      expect(selectedTimes(fixture)).toEqual([]);
+      expect(summary(fixture)).toBe('Choose a start time, or click a free slot below.');
+    });
+
+    it('shows a rule the server enforced, and keeps a choice that is still free', async () => {
+      bookingAnswer = throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 400,
+            error: {
+              detail: 'One or more fields are invalid.',
+              errors: { StartUtc: ['Bookings must be made in advance.'] },
+            },
+          }),
+      );
+      const fixture = await render('2026-10-01');
+      await click(fixture, slotButton(fixture, '10:00'));
+
+      await click(fixture, button(fixture, 'Book'));
+
+      expect(show).toHaveBeenCalledWith('Bookings must be made in advance.');
+      expect(scheduleApi).toHaveBeenCalledTimes(2);
+      expect(selectedTimes(fixture)).toEqual(['10:00–10:15']);
+    });
+
+    it('drops a choice that the reloaded schedule shows as taken', async () => {
+      bookingAnswer = throwError(
+        () => new HttpErrorResponse({ status: 400, error: { detail: 'That slot has started.' } }),
+      );
+      const fixture = await render('2026-10-01');
+      await click(fixture, slotButton(fixture, '10:00'));
+      const started = freeDay();
+      started.slots[0] = { ...started.slots[0], isPast: true };
+      answers.push(of(started));
+
+      await click(fixture, button(fixture, 'Book'));
+
+      expect(show).toHaveBeenCalledWith('That slot has started.');
+      expect(selectedTimes(fixture)).toEqual([]);
+    });
+
+    it('keeps the choice after a network failure so the user can try again', async () => {
+      bookingAnswer = throwError(() => new HttpErrorResponse({ status: 0 }));
+      const fixture = await render('2026-10-01');
+      await click(fixture, slotButton(fixture, '10:00'));
+
+      await click(fixture, button(fixture, 'Book'));
+
+      expect(show).toHaveBeenCalledWith('Something went wrong. Please try again.');
+      expect(scheduleApi).toHaveBeenCalledOnce();
+      expect(summary(fixture)).toBe('10:00–10:15, 15 min');
+      expect(button(fixture, 'Book').disabled).toBe(false);
+    });
+
+    it('clears the choice', async () => {
+      const fixture = await render('2026-10-01');
+      await click(fixture, slotButton(fixture, '10:00'));
+
+      await click(fixture, button(fixture, 'Clear'));
+
+      expect(selectedTimes(fixture)).toEqual([]);
+      expect(button(fixture, 'Book').disabled).toBe(true);
+    });
+
+    it('offers nothing to book on a removed resource', async () => {
+      answers.push(of({ ...freeDay(), isActive: false }));
+
+      const fixture = await render('2026-10-01');
+
+      expect(page(fixture).querySelector('.booking')).toBeNull();
+      expect(slotRows(fixture).every((row) => (row as HTMLButtonElement).disabled)).toBe(true);
+    });
+
+    it('says when no slot is left to book', async () => {
+      const full = freeDay();
+      full.slots = full.slots.map((s) => ({ ...s, isBooked: true }));
+      answers.push(of(full));
+
+      const fixture = await render('2026-10-01');
+
+      expect(page(fixture).querySelector('.booking')).toBeNull();
+      expect(page(fixture).textContent).toContain('No free slots left on this day.');
+    });
   });
 });

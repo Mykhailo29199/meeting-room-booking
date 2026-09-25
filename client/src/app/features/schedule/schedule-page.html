@@ -13,7 +13,7 @@
       <p>This resource no longer exists.</p>
     } @else {
       <p>{{ error.message }}</p>
-      <button mat-stroked-button type="button" (click)="retry()">Try again</button>
+      <button mat-stroked-button type="button" (click)="reload()">Try again</button>
     }
   </div>
 } @else if (view(); as view) {
@@ -59,22 +59,79 @@
     }
   </p>
 
+  @if (view.form; as form) {
+    <section class="booking" aria-label="Book a time">
+      <div class="booking-fields">
+        <mat-form-field subscriptSizing="dynamic">
+          <mat-label>Start</mat-label>
+          <mat-select [value]="form.start" (selectionChange)="chooseStart($event.value)">
+            @for (option of form.startOptions; track option.value) {
+              <mat-option [value]="option.value">{{ option.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field subscriptSizing="dynamic">
+          <mat-label>End</mat-label>
+          <mat-select
+            [value]="form.end"
+            [disabled]="!form.start"
+            (selectionChange)="chooseEnd($event.value)"
+          >
+            @for (option of form.endOptions; track option.value) {
+              <mat-option [value]="option.value">{{ option.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <p class="summary" aria-live="polite">
+        {{ form.summary ?? 'Choose a start time, or click a free slot below.' }}
+      </p>
+      <div class="booking-actions">
+        <button
+          mat-flat-button
+          type="button"
+          [disabled]="!form.start || booking()"
+          (click)="book()"
+        >
+          Book
+        </button>
+        <button mat-button type="button" [disabled]="!form.start" (click)="clearSelection()">
+          Clear
+        </button>
+      </div>
+    </section>
+  } @else if (view.isActive && view.slots.length > 0) {
+    <p class="empty">No free slots left on this day.</p>
+  }
+
   @if (view.slots.length === 0) {
     <p class="empty">There are no slots on this day.</p>
   } @else {
     <ol class="slots" [attr.aria-label]="'Slots on ' + view.longDate">
       @for (slot of view.slots; track slot.key) {
-        <li class="slot" [attr.data-status]="slot.status">
-          <span class="time">
-            {{ slot.time }}
-            @if (slot.viewerTime) {
-              <span class="viewer-time">({{ slot.viewerTime }})</span>
-            }
-          </span>
-          <span class="status">
-            <mat-icon aria-hidden="true">{{ slot.icon }}</mat-icon>
-            {{ slot.label }}
-          </span>
+        <li>
+          <!-- Only free slots of an active resource can be chosen; the others
+               are disabled, which also keeps them out of the tab order. -->
+          <button
+            type="button"
+            class="slot"
+            [attr.data-status]="slot.status"
+            [class.selected]="slot.selected"
+            [disabled]="!slot.selectable"
+            [attr.aria-pressed]="slot.selectable ? slot.selected : null"
+            (click)="clickSlot(slot.key)"
+          >
+            <span class="time">
+              {{ slot.time }}
+              @if (slot.viewerTime) {
+                <span class="viewer-time">({{ slot.viewerTime }})</span>
+              }
+            </span>
+            <span class="status">
+              <mat-icon aria-hidden="true">{{ slot.icon }}</mat-icon>
+              {{ slot.label }}
+            </span>
+          </button>
         </li>
       }
     </ol>
