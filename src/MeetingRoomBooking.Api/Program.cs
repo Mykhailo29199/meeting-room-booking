@@ -19,6 +19,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 // Use cases.
 builder.Services.AddScoped<BookingService>();
+builder.Services.AddScoped<BookingListService>();
 builder.Services.AddScoped<ResourceService>();
 
 // Authentication: every request may carry "Authorization: Bearer <token>".

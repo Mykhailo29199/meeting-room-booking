@@ -103,9 +103,10 @@ public class BookingServiceTests : IAsyncLifetime
     {
         var booking = await BookAsync(Alice, Berlin(10, 0), Berlin(11, 0));
 
-        var remaining = await AsRequest(s => s.CancelAsync(booking.Id, Alice));
+        var result = await AsRequest(s => s.CancelAsync(booking.Id, Alice));
 
-        Assert.Null(remaining);
+        Assert.True(result.CancelledCompletely);
+        Assert.Null(result.RemainingBooking);
         Assert.Equal(0, await SlotCountAsync());
         await using (var context = _database.CreateContext())
         {
@@ -120,10 +121,11 @@ public class BookingServiceTests : IAsyncLifetime
         // Alice booked 08:00–20:00 and leaves at 14:05.
         var booking = await BookAsync(Alice, Berlin(8, 0), Berlin(20, 0));
 
-        var remaining = await AsRequest(s => s.CancelAsync(booking.Id, Alice), nowUtc: Berlin(14, 5));
+        var result = await AsRequest(s => s.CancelAsync(booking.Id, Alice), nowUtc: Berlin(14, 5));
 
-        Assert.NotNull(remaining);
-        Assert.Equal(Berlin(14, 15), remaining.EndUtc);
+        Assert.False(result.CancelledCompletely);
+        Assert.NotNull(result.RemainingBooking);
+        Assert.Equal(Berlin(14, 15), result.RemainingBooking.EndUtc);
         Assert.Equal(25, await SlotCountAsync()); // 08:00 ... 14:00 kept as history
 
         // The slot in progress is still Alice's; everything after it is free.
@@ -233,6 +235,31 @@ public class BookingServiceTests : IAsyncLifetime
         // 08:00 ... 10:00 have started by 10:05.
         Assert.Equal(9, schedule.Slots.Count(s => s.IsPast));
         Assert.False(schedule.Slots.Single(s => s.StartUtc == Berlin(10, 15)).IsPast);
+    }
+
+    [Fact]
+    public async Task Schedule_without_a_date_shows_today_where_the_resource_is()
+    {
+        // 23:30 UTC on 30 Sep is already 1 Oct in Berlin (UTC+2).
+        var nowUtc = new DateTime(2026, 9, 30, 23, 30, 0, DateTimeKind.Utc);
+
+        var schedule = await AsRequest(s => s.GetScheduleAsync(_resource.Id, localDate: null, Alice), nowUtc);
+
+        Assert.Equal(new DateOnly(2026, 10, 1), schedule.LocalDate);
+    }
+
+    [Fact]
+    public async Task Schedule_of_a_removed_resource_is_hidden_from_users_but_not_admins()
+    {
+        await using (var context = _database.CreateContext())
+        {
+            (await context.Resources.SingleAsync(r => r.Id == _resource.Id)).Deactivate();
+            await context.SaveChangesAsync();
+        }
+
+        await Assert.ThrowsAsync<NotFoundException>(() => AsRequest(s => s.GetScheduleAsync(_resource.Id, BookingDay, Alice)));
+        var forAdmin = await AsRequest(s => s.GetScheduleAsync(_resource.Id, BookingDay, Admin));
+        Assert.False(forAdmin.IsActive);
     }
 
     [Fact]

@@ -2,10 +2,13 @@
 
   <PropertyGroup>
     <!-- The /// comments on controllers become endpoint descriptions in the
-         OpenAPI document and Swagger UI. CS1591 ("missing XML comment") is
-         off: not every public type needs one, and warnings are errors here. -->
+         OpenAPI document and Swagger UI. Off, because warnings are errors here:
+         CS1591 ("missing XML comment") - not every public type needs one;
+         CS1573 ("parameter has no param tag") - documenting query parameters
+         must not force a tag for the CancellationToken, which is not part of
+         the API. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

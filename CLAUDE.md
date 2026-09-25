@@ -76,6 +76,15 @@ Infrastructure ──┘        (implements Application's interfaces)
     client's `Version`), remove, restore. Admin-only actions are restricted
     by the controller (`[Authorize(Roles = Roles.Admin)]`), not re-checked
     in the service.
+  - `Bookings/BookingListService` + `IBookingQueries` — "my bookings" and
+    the admin's all-bookings list (≤ 500, earliest first, upcoming unless
+    `includePast`). A read-only query, not a repository: it joins bookings
+    with resources and Identity users, which only Infrastructure knows
+    (`Infrastructure/Persistence/BookingQueries`, left join because
+    `UserId` has no FK).
+  - Booking input times must arrive as UTC (`...Z`); anything else is a
+    `ValidationException` (400) raised in `BookingService`, never passed to
+    the domain (whose UTC guard is a programming-error check → 500).
   - `Common/Exceptions.cs` — use-case outcomes the API maps to HTTP:
     `NotFoundException` 404, `ForbiddenException` 403, `ConflictException`
     409. Domain rule violations stay `DomainException` → 400.
@@ -216,14 +225,14 @@ Infrastructure ──┘        (implements Application's interfaces)
 
 ## Not built yet
 
-Booking and schedule endpoints, "my bookings" and the admin's all-bookings
-view, the parallel-requests concurrency test, SignalR, Angular client,
-Azure deployment. What exists: the Domain layer, the persistence layer (EF
-Core model, unit of work, repositories, migrations `InitialCreate` and
-`AddIdentity`), the booking service (create, cancel, schedule), resource
-management with its endpoints (`/api/resources`), authentication (register,
-login, me, roles, admin seeding), the exception-to-HTTP mapping, Swagger UI,
-and their tests.
+The parallel-requests concurrency test (task item 6), SignalR real-time
+updates, the Angular client, Azure deployment, and the README section that
+explains the concurrency design to the reviewer. What exists: the Domain
+layer, persistence (EF Core model, unit of work, repositories, migrations
+`InitialCreate` and `AddIdentity`), the complete REST API — auth
+(`/api/auth`), resources and schedules (`/api/resources`), bookings
+(`/api/bookings`) — with exception-to-HTTP mapping and Swagger UI, and their
+tests.
 
 ## Tests and databases
 

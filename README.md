@@ -55,6 +55,23 @@ They create and drop their own temporary databases.
    Endpoints with a lock icon need a token; `GET /api/auth/me` shows whose
    token you are using.
 
+## API overview
+All endpoints except register and login need a bearer token. Times in
+requests and responses are UTC; each resource carries its IANA time zone for
+display.
+
+| Endpoint | Who | What |
+|---|---|---|
+| `POST /api/auth/register`, `POST /api/auth/login` | anyone | get an access token |
+| `GET /api/auth/me` | signed in | whose token this is |
+| `GET /api/resources`, `GET /api/resources/{id}` | signed in | resources (admins also see removed ones) |
+| `GET /api/resources/{id}/schedule?date=` | signed in | the day's 15-minute slots: free, booked, past |
+| `POST /api/bookings` | signed in | book slots; 409 if someone took them first |
+| `DELETE /api/bookings/{id}` | owner or admin | cancel, or end early if under way |
+| `GET /api/bookings/mine` | signed in | own bookings |
+| `GET /api/bookings` | admin | all users' bookings |
+| `POST/PUT/DELETE /api/resources…`, `POST /api/resources/{id}/restore` | admin | create, edit, remove, restore resources |
+
 ## Development with Claude Code
 This project is built with Claude Code as a pair programmer. I set the
 direction, make the design decisions, test the running application, review

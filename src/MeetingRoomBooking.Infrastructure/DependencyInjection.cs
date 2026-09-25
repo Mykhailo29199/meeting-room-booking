@@ -1,4 +1,5 @@
 using MeetingRoomBooking.Application.Auth;
+using MeetingRoomBooking.Application.Bookings;
 using MeetingRoomBooking.Application.Persistence;
 using MeetingRoomBooking.Infrastructure.Identity;
 using MeetingRoomBooking.Infrastructure.Persistence;
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionString));
         services.AddSingleton<IUniqueConstraintViolationDetector, SqlServerUniqueConstraintViolationDetector>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IBookingQueries, BookingQueries>();
 
         services
             .AddIdentityCore<ApplicationUser>(options =>

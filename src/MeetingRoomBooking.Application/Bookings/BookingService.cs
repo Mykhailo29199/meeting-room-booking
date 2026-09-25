@@ -43,12 +43,15 @@ public sealed class BookingService
     /// not wait for each other. The lock is only about removal — which slot
     /// wins is still decided by the primary key.
     /// </summary>
+    /// <exception cref="ValidationException">A time is not given in UTC.</exception>
     /// <exception cref="NotFoundException">The resource does not exist.</exception>
     /// <exception cref="DomainException">The request breaks a business rule (e.g. the resource was removed).</exception>
     /// <exception cref="ConflictException">A slot was taken by another request.</exception>
     public async Task<BookingDto> CreateAsync(
         CreateBookingRequest request, UserContext user, CancellationToken cancellationToken = default)
     {
+        EnsureUtcInput(request);
+
         await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
         if (!await _unitOfWork.Resources.LockAsync(request.ResourceId, cancellationToken))
@@ -81,11 +84,10 @@ public sealed class BookingService
     /// — it frees the remaining slots and keeps the past ones. Users can do
     /// this to their own bookings; admins to any.
     /// </summary>
-    /// <returns>The shortened booking, or null if it was cancelled completely.</returns>
     /// <exception cref="NotFoundException">The booking does not exist (or was already cancelled).</exception>
     /// <exception cref="ForbiddenException">It is someone else's booking and the user is not an admin.</exception>
     /// <exception cref="DomainException">Nothing is left to release.</exception>
-    public async Task<BookingDto?> CancelAsync(Guid bookingId, UserContext user, CancellationToken cancellationToken = default)
+    public async Task<CancellationResult> CancelAsync(Guid bookingId, UserContext user, CancellationToken cancellationToken = default)
     {
         var booking = await _unitOfWork.Bookings.GetByIdAsync(bookingId, cancellationToken)
             ?? throw new NotFoundException("The booking does not exist.");
@@ -102,27 +104,35 @@ public sealed class BookingService
         // are deleted, together with the new EndUtc, in the same commit.
 
         await _unitOfWork.CompleteAsync(cancellationToken);
-        return outcome == ReleaseOutcome.Cancelled ? null : ToDto(booking);
+        return outcome == ReleaseOutcome.Cancelled
+            ? new CancellationResult(CancelledCompletely: true, RemainingBooking: null)
+            : new CancellationResult(CancelledCompletely: false, RemainingBooking: ToDto(booking));
     }
 
     /// <summary>
-    /// Every slot of the resource on its local <paramref name="localDate"/>,
-    /// marked free or booked — the "fixed set of bookable time slots" view.
+    /// Every slot of the resource on its local <paramref name="localDate"/>
+    /// (default: today where the resource is), marked free or booked — the
+    /// task's "which slots are free and which are booked" view.
     /// </summary>
-    /// <exception cref="NotFoundException">The resource does not exist.</exception>
+    /// <exception cref="NotFoundException">
+    /// The resource does not exist — or was removed and the user is not an admin.
+    /// </exception>
     public async Task<ResourceScheduleDto> GetScheduleAsync(
-        Guid resourceId, DateOnly localDate, UserContext user, CancellationToken cancellationToken = default)
+        Guid resourceId, DateOnly? localDate, UserContext user, CancellationToken cancellationToken = default)
     {
-        var resource = await _unitOfWork.Resources.GetByIdAsync(resourceId, cancellationToken)
-            ?? throw new NotFoundException("The resource does not exist.");
+        var resource = await _unitOfWork.Resources.GetByIdAsync(resourceId, cancellationToken);
+        if (resource is null || (!resource.IsActive && !user.IsAdmin))
+            throw new NotFoundException("The resource does not exist.");
 
-        var slotStarts = resource.GetSlotStarts(localDate);
+        var nowUtc = _time.GetUtcNow().UtcDateTime;
+        var date = localDate ?? DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(nowUtc, resource.TimeZone));
+
+        var slotStarts = resource.GetSlotStarts(date);
         var bookedSlots = slotStarts.Count == 0
             ? []
             : await _unitOfWork.Bookings.GetBookedSlotsAsync(
                 resourceId, slotStarts[0], slotStarts[^1] + TimeSlots.Length, cancellationToken);
         var bookedByStart = bookedSlots.ToDictionary(s => s.SlotStartUtc);
-        var nowUtc = _time.GetUtcNow().UtcDateTime;
 
         var slots = slotStarts.Select(start =>
         {
@@ -138,7 +148,24 @@ public sealed class BookingService
         }).ToList();
 
         return new ResourceScheduleDto(
-            resource.Id, resource.Name, resource.TimeZoneId, localDate, resource.IsActive, slots);
+            resource.Id, resource.Name, resource.TimeZoneId, date, resource.IsActive, slots);
+    }
+
+    /// <summary>
+    /// Client input, not a programming error: "2026-10-01T08:00:00" (no zone)
+    /// or "...+02:00" (converted to server-local time) would otherwise reach
+    /// the domain, which accepts only UTC. Rejected with a clear 400 instead
+    /// of being guessed at.
+    /// </summary>
+    private static void EnsureUtcInput(CreateBookingRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (request.StartUtc.Kind != DateTimeKind.Utc)
+            errors[nameof(CreateBookingRequest.StartUtc)] = ["Must be a UTC time ending in 'Z', e.g. 2026-10-01T08:00:00Z."];
+        if (request.EndUtc.Kind != DateTimeKind.Utc)
+            errors[nameof(CreateBookingRequest.EndUtc)] = ["Must be a UTC time ending in 'Z', e.g. 2026-10-01T09:00:00Z."];
+        if (errors.Count > 0)
+            throw new ValidationException(errors);
     }
 
     private static BookingDto ToDto(Booking booking) =>

@@ -1,4 +1,5 @@
 using MeetingRoomBooking.Api.Auth;
+using MeetingRoomBooking.Application.Bookings;
 using MeetingRoomBooking.Application.Common;
 using MeetingRoomBooking.Application.Resources;
 using Microsoft.AspNetCore.Authorization;
@@ -17,8 +18,13 @@ namespace MeetingRoomBooking.Api.Controllers;
 public sealed class ResourcesController : ControllerBase
 {
     private readonly ResourceService _resources;
+    private readonly BookingService _bookings;
 
-    public ResourcesController(ResourceService resources) => _resources = resources;
+    public ResourcesController(ResourceService resources, BookingService bookings)
+    {
+        _resources = resources;
+        _bookings = bookings;
+    }
 
     /// <summary>Lists resources: bookable ones for users, all (including removed) for admins.</summary>
     [HttpGet]
@@ -33,6 +39,21 @@ public sealed class ResourcesController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public Task<ResourceDto> Get(Guid id, CancellationToken cancellationToken) =>
         _resources.GetAsync(id, User.ToUserContext(), cancellationToken);
+
+    /// <summary>A resource's slots for one day: free, booked or past.</summary>
+    /// <remarks>
+    /// Slot times are UTC; show them in the resource's <c>timeZoneId</c>, and
+    /// send them back unchanged to book. Your own bookings carry a
+    /// <c>bookingId</c> (to cancel); who booked other slots is not shown.
+    /// </remarks>
+    /// <param name="id">The resource.</param>
+    /// <param name="date">Day in the resource's local time, e.g. 2026-10-01. Default: today there.</param>
+    /// <response code="404">The resource does not exist (or was removed).</response>
+    [HttpGet("{id:guid}/schedule")]
+    [ProducesResponseType<ResourceScheduleDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public Task<ResourceScheduleDto> Schedule(Guid id, [FromQuery] DateOnly? date, CancellationToken cancellationToken) =>
+        _bookings.GetScheduleAsync(id, date, User.ToUserContext(), cancellationToken);
 
     /// <summary>Creates a resource. Admin only.</summary>
     /// <remarks>Opening hours are local times in the resource's time zone, on 15-minute boundaries.</remarks>
