@@ -1,4 +1,5 @@
 using MeetingRoomBooking.Api.Errors;
+using MeetingRoomBooking.Api.OpenApi;
 using MeetingRoomBooking.Application.Bookings;
 using MeetingRoomBooking.Infrastructure;
 using MeetingRoomBooking.Infrastructure.Identity;
@@ -44,8 +45,14 @@ builder.Services
 builder.Services.AddAuthorization();
 
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+
+// OpenAPI description (/openapi/v1.json), including bearer-token security,
+// shown by Swagger UI at /swagger.
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<BearerSecurityTransformer>();
+    options.AddOperationTransformer<BearerSecurityTransformer>();
+});
 
 // Errors: application exceptions -> 400/401/403/404/409 problem details;
 // anything else -> generic 500 problem details.
@@ -61,9 +68,16 @@ await IdentitySeeder.SeedAsync(app.Services);
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
-if (app.Environment.IsDevelopment())
+// API docs and Swagger UI everywhere except Production (for now; whether the
+// deployed app exposes them is decided with the Azure deployment).
+if (!app.Environment.IsProduction())
 {
     app.MapOpenApi();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/openapi/v1.json", "Meeting Room Booking API");
+        options.DocumentTitle = "Meeting Room Booking API";
+    });
 }
 
 app.UseHttpsRedirection();

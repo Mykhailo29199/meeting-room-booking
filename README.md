@@ -45,6 +45,15 @@ They create and drop their own temporary databases.
    ```bash
    dotnet run --project src/MeetingRoomBooking.Api
    ```
+4. Open Swagger UI at http://localhost:5077/swagger (Visual Studio opens it
+   automatically). To call protected endpoints:
+   1. `POST /api/auth/login` with the admin from `Seed:*` (or
+      `POST /api/auth/register` to create a regular user);
+   2. copy `accessToken` from the response;
+   3. click **Authorize** and paste the token (without `Bearer `).
+
+   Endpoints with a lock icon need a token; `GET /api/auth/me` shows whose
+   token you are using.
 
 ## Development with Claude Code
 This project is built with Claude Code as a pair programmer. I set the

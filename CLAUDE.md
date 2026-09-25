@@ -105,6 +105,13 @@ Infrastructure ──┘        (implements Application's interfaces)
     actions that must be public opt out with `[AllowAnonymous]`.
     `ControllerSecurityTests` enforces this for every controller and pins
     the list of anonymous actions — extend it deliberately when adding one.
+  - OpenAPI: the built-in document (`/openapi/v1.json`) shown by Swagger UI at
+    `/swagger`, both only outside Production for now (decide at deployment).
+    `OpenApi/BearerSecurityTransformer` adds the Bearer scheme and marks
+    exactly the endpoints that require a token, derived from their
+    `[Authorize]`/`[AllowAnonymous]` metadata. Endpoint summaries come from
+    `///` comments (`GenerateDocumentationFile`, CS1591 suppressed in Api
+    only) — write them for every new action.
 - Wording rule for comments and commit messages: inner layers *throw*; only
   the API *returns* status codes — write "throws ConflictException, which the
   API returns as 409", not "the service returns 409".
@@ -178,13 +185,13 @@ Infrastructure ──┘        (implements Application's interfaces)
 
 ## Not built yet
 
-Swagger UI, booking/schedule/resource endpoints, resource management and
-all-bookings admin use cases, the parallel-requests concurrency test,
-SignalR, Angular client, Azure deployment. What exists: the Domain layer,
-the persistence layer (EF Core model, unit of work, repositories, migrations
-`InitialCreate` and `AddIdentity`), the booking service (create, cancel,
-schedule), authentication (register, login, me, roles, admin seeding), the
-exception-to-HTTP mapping, and their tests.
+Booking/schedule/resource endpoints, resource management and all-bookings
+admin use cases, the parallel-requests concurrency test, SignalR, Angular
+client, Azure deployment. What exists: the Domain layer, the persistence
+layer (EF Core model, unit of work, repositories, migrations `InitialCreate`
+and `AddIdentity`), the booking service (create, cancel, schedule),
+authentication (register, login, me, roles, admin seeding), the
+exception-to-HTTP mapping, Swagger UI, and their tests.
 
 ## Tests and databases
 
