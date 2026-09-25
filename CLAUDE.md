@@ -101,6 +101,10 @@ Infrastructure ──┘        (implements Application's interfaces)
     `UniqueConstraintViolationException` a service forgot to translate) is a
     bug and becomes a generic 500. Don't catch-and-map exceptions in
     controllers.
+  - Controllers are secure by default: `[Authorize]` on the class, and
+    actions that must be public opt out with `[AllowAnonymous]`.
+    `ControllerSecurityTests` enforces this for every controller and pins
+    the list of anonymous actions — extend it deliberately when adding one.
 - Wording rule for comments and commit messages: inner layers *throw*; only
   the API *returns* status codes — write "throws ConflictException, which the
   API returns as 409", not "the service returns 409".

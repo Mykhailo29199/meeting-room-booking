@@ -7,9 +7,15 @@ using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace MeetingRoomBooking.Api.Controllers;
 
+/// <remarks>
+/// Secure by default: [Authorize] on the class covers every action, and the
+/// two that must work without a token opt out with [AllowAnonymous]. A new
+/// action added here is protected even if nobody remembers the attribute.
+/// </remarks>
 [ApiController]
 [Route("api/auth")]
 [Produces("application/json")]
+[Authorize]
 public sealed class AuthController : ControllerBase
 {
     private readonly IAuthService _auth;
@@ -39,7 +45,6 @@ public sealed class AuthController : ControllerBase
     /// <summary>Who the current token belongs to — handy for checking a token.</summary>
     /// <response code="401">Missing, invalid or expired token.</response>
     [HttpGet("me")]
-    [Authorize]
     [ProducesResponseType<CurrentUserDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public CurrentUserDto Me() => new(
