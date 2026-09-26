@@ -114,11 +114,24 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
+// The Angular client, copied into wwwroot when the app is published: its
+// files here, and index.html for "/" and its routes by the fallback below.
+// One origin for the client, the API and the hub, so no CORS. Locally
+// wwwroot is empty and the Angular dev server serves the client.
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<ScheduleHub>(ScheduleHub.Path);
+
+// Any other path is a client route (/resources/..., /my-bookings): the
+// client's index.html, whose router takes over. Unknown API and hub paths
+// stay 404 problem details, so a wrong API URL never looks like a page.
+app.MapFallback("/api/{**path}", () => Results.NotFound());
+app.MapFallback("/hubs/{**path}", () => Results.NotFound());
+app.MapFallbackToFile("index.html");
 
 app.Run();
 

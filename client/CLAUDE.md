@@ -188,6 +188,11 @@ Build the client in these steps, each a working, tested state. Update the
    and the returned counts, restore), `/admin/bookings` (filter by resource,
    include past, cancel any); loading, empty and error states.
 
+How it landed: step 6 was split into three commits (my bookings, admin
+resources, admin bookings) because together they were too large to review.
+Two fixes found along the way got their own commits: the HTTPS redirect in
+development (it broke the dev proxy) and the icon font.
+
 **Status:** all six steps are done — dev proxy, environments, `core/api/`
 (models, HTTP clients, `toApiError`); `core/auth/` (`AuthService`, the
 interceptor, the guards, `safeReturnUrl`), the login and register pages

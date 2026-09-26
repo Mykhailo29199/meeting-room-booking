@@ -136,6 +136,13 @@ Infrastructure ──┘        (implements Application's interfaces)
     cancellation token — the change is saved and other viewers must hear of
     it. The message never says who booked. Browsers send the JWT as
     `?access_token=`; `Program` accepts that on the hub path only.
+  - Hosts the Angular client: the published app has the client's build in
+    `wwwroot` (copied there when publishing; git-ignored), served as static
+    files, with `index.html` as the fallback for every other path so client
+    routes work when opened directly. Unknown `/api/...` and `/hubs/...`
+    paths stay 404 problem details, never the client page
+    (`ClientHostingTests`). One origin, so no CORS. Locally `wwwroot` is
+    empty and `ng serve` serves the client.
   - OpenAPI: the built-in document (`/openapi/v1.json`) shown by Swagger UI at
     `/swagger`, both only outside Production for now (decide at deployment).
     `OpenApi/BearerSecurityTransformer` adds the Bearer scheme and marks
