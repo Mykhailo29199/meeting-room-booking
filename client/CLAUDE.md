@@ -91,17 +91,26 @@ developer's git-ignored `appsettings.Development.json` (`Seed:*`).
 
 ## Real-time schedule updates
 
-- One shared hub connection (`ScheduleHubService`) to `/hubs/schedule`,
-  token via `accessTokenFactory` (sent as `?access_token=`), automatic
-  reconnect.
-- A schedule page calls `watch(resourceId)` on open and `unwatch` on leave,
-  and applies `SlotsChanged` events to its slots.
+- One shared hub connection (`ScheduleHubService`, `core/realtime/`) to
+  `/hubs/schedule`, created by `HUB_CONNECTION_FACTORY` (tests use a
+  fake), token via `accessTokenFactory` (asked on every connect, sent as
+  `?access_token=`), automatic reconnect. Stopped on sign-out.
+- A schedule page calls `watch(resourceId)` for the resource it shows and
+  `unwatch` when it leaves or switches (reference-counted), and applies
+  `slotsChanged(id)` with `applySlotChanges`
+  (`features/schedule/slot-changes.ts`).
 - Group membership is lost when the connection drops, and events sent
-  meanwhile are missed. On `onreconnected` the service re-joins every
-  watched resource and the page **reloads its schedule**; after the
-  connection closes for good it is restarted and the same happens.
+  meanwhile are missed. After every (re)join — the first one, an automatic
+  reconnect, or a restart after the connection closed for good (retried
+  with growing delays) — `joined(id)` fires and the page **reloads its
+  schedule**. The first join counts too: it closes the gap between loading
+  the schedule and joining. Whether the connection is ready is the
+  service's own flag, not SignalR's `state`, which turns `Connected` just
+  before the join runs.
 - Events never say who booked. After the user's own booking or
-  cancellation, reload the schedule to get `isMine` / `bookingId`.
+  cancellation, reload the schedule to get `isMine` / `bookingId`. An event
+  never downgrades a slot already loaded as the user's own, and while the
+  user's own booking is in flight its event does not clear their choice.
 
 ## Error handling in the UI
 
@@ -177,7 +186,7 @@ Build the client in these steps, each a working, tested state. Update the
    and the returned counts, restore), `/admin/bookings` (filter by resource,
    include past, cancel any); loading, empty and error states.
 
-**Status:** steps 1–4 are done — dev proxy, environments, `core/api/`
+**Status:** steps 1–5 are done — dev proxy, environments, `core/api/`
 (models, HTTP clients, `toApiError`); `core/auth/` (`AuthService`, the
 interceptor, the guards, `safeReturnUrl`), the login and register pages
 (`shared/forms/showApiErrorOnForm` puts server field errors on the fields),
@@ -188,9 +197,10 @@ and the shell with its toolbar (`shared/layout/`); `core/time/`
 parameters bound as inputs; slot states in `slot-status`), booking from the
 schedule (range rules in `slot-selection`: Start/End selects and slot
 clicks, `keepIfAvailable` after every reload; `core/notify/Notifier` for
-snackbars), all with tests. The toolbar gets its admin links in step 6,
-with the pages they lead to; `isAdmin` and `adminGuard` exist already.
-Next is step 5.
+snackbars), live schedule updates (`core/realtime/ScheduleHubService`, see
+"Real-time schedule updates"), all with tests. The toolbar gets its admin
+links in step 6, with the pages they lead to; `isAdmin` and `adminGuard`
+exist already. Next is step 6.
 
 ## Quality bar
 

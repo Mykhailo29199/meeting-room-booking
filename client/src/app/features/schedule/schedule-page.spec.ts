@@ -3,12 +3,13 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatSelectHarness } from '@angular/material/select/testing';
 import { NavigationExtras, provideRouter, Router } from '@angular/router';
-import { NEVER, Observable, of, throwError } from 'rxjs';
+import { filter, map, NEVER, Observable, of, Subject, throwError } from 'rxjs';
 import type { MockInstance } from 'vitest';
 import { BookingsApi } from '../../core/api/bookings-api';
-import { Booking, ResourceSchedule, Slot } from '../../core/api/models';
+import { Booking, ResourceSchedule, Slot, SlotsChangedMessage } from '../../core/api/models';
 import { ResourcesApi } from '../../core/api/resources-api';
 import { Notifier } from '../../core/notify/notifier';
+import { ScheduleHubService } from '../../core/realtime/schedule-hub.service';
 import { VIEWER_TIME_ZONE } from '../../core/time/viewer-time-zone';
 import { SchedulePage } from './schedule-page';
 
@@ -55,6 +56,10 @@ describe('SchedulePage', () => {
   let bookingAnswer: Observable<Booking>;
   let create: ReturnType<typeof vi.fn>;
   let show: ReturnType<typeof vi.fn>;
+  let hubChanges: Subject<SlotsChangedMessage>;
+  let hubJoins: Subject<string>;
+  let watch: ReturnType<typeof vi.fn>;
+  let unwatch: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     answers = [];
@@ -62,6 +67,10 @@ describe('SchedulePage', () => {
     bookingAnswer = of({} as Booking);
     create = vi.fn(() => bookingAnswer);
     show = vi.fn();
+    hubChanges = new Subject();
+    hubJoins = new Subject();
+    watch = vi.fn();
+    unwatch = vi.fn();
     viewerTimeZone = 'Europe/Berlin';
     TestBed.configureTestingModule({
       providers: [
@@ -69,6 +78,23 @@ describe('SchedulePage', () => {
         { provide: ResourcesApi, useValue: { schedule: scheduleApi } },
         { provide: BookingsApi, useValue: { create } },
         { provide: Notifier, useValue: { show } },
+        {
+          provide: ScheduleHubService,
+          useValue: {
+            watch,
+            unwatch,
+            slotsChanged: (id: string) =>
+              hubChanges.pipe(
+                filter((message) => message.resourceId === id),
+                map((message) => message.slots),
+              ),
+            joined: (id: string) =>
+              hubJoins.pipe(
+                filter((joined) => joined === id),
+                map(() => undefined),
+              ),
+          },
+        },
         { provide: VIEWER_TIME_ZONE, useFactory: () => viewerTimeZone },
       ],
     });
@@ -422,6 +448,108 @@ describe('SchedulePage', () => {
 
       expect(page(fixture).querySelector('.booking')).toBeNull();
       expect(page(fixture).textContent).toContain('No free slots left on this day.');
+    });
+
+    describe('live updates', () => {
+      function changed(start: string, end: string, isBooked: boolean): void {
+        hubChanges.next({ resourceId: 'r1', slots: [{ startUtc: start, endUtc: end, isBooked }] });
+      }
+
+      function status(fixture: ComponentFixture<unknown>, time: string): string {
+        return slotButton(fixture, time)
+          .querySelector('.status')!
+          .textContent!.replace(/\s+/g, ' ')
+          .trim();
+      }
+
+      it('watches the resource while the page shows it', async () => {
+        const fixture = await render('2026-10-01');
+        expect(watch).toHaveBeenCalledExactlyOnceWith('r1');
+
+        fixture.destroy();
+
+        expect(unwatch).toHaveBeenCalledExactlyOnceWith('r1');
+      });
+
+      it('switches to another resource opened on the same page', async () => {
+        const fixture = await render('2026-10-01');
+
+        fixture.componentRef.setInput('id', 'r2');
+        await fixture.whenStable();
+
+        expect(unwatch).toHaveBeenCalledExactlyOnceWith('r1');
+        expect(watch.mock.calls).toEqual([['r1'], ['r2']]);
+      });
+
+      it('shows slots booked by someone else without reloading', async () => {
+        const fixture = await render('2026-10-01');
+
+        changed('2026-10-01T08:00:00Z', '2026-10-01T08:15:00Z', true);
+        await fixture.whenStable();
+
+        expect(status(fixture, '10:00')).toBe('event_busy Booked');
+        expect(slotButton(fixture, '10:00').disabled).toBe(true);
+        expect(scheduleApi).toHaveBeenCalledOnce();
+      });
+
+      it('shows slots that became free', async () => {
+        const fixture = await render('2026-10-01');
+
+        changed('2026-10-01T08:45:00Z', '2026-10-01T09:00:00Z', false);
+        await fixture.whenStable();
+
+        expect(status(fixture, '10:45')).toBe('event_available Free');
+        expect(slotButton(fixture, '10:45').disabled).toBe(false);
+      });
+
+      it('clears a choice that someone else just booked, and says so', async () => {
+        const fixture = await render('2026-10-01');
+        await click(fixture, slotButton(fixture, '10:00'));
+        await click(fixture, slotButton(fixture, '10:15'));
+
+        changed('2026-10-01T08:15:00Z', '2026-10-01T08:30:00Z', true);
+        await fixture.whenStable();
+
+        expect(selectedTimes(fixture)).toEqual([]);
+        expect(show).toHaveBeenCalledWith(
+          'The time you chose has just been booked by someone else. Please choose another.',
+        );
+      });
+
+      it('keeps a choice when other slots change', async () => {
+        const fixture = await render('2026-10-01');
+        await click(fixture, slotButton(fixture, '10:00'));
+
+        changed('2026-10-01T09:00:00Z', '2026-10-01T09:15:00Z', true);
+        await fixture.whenStable();
+
+        expect(selectedTimes(fixture)).toEqual(['10:00–10:15']);
+        expect(show).not.toHaveBeenCalled();
+      });
+
+      it("leaves the user's own booking in flight to its response", async () => {
+        bookingAnswer = NEVER;
+        const fixture = await render('2026-10-01');
+        await click(fixture, slotButton(fixture, '10:00'));
+        await click(fixture, button(fixture, 'Book'));
+
+        // The server announces the booking before its response arrives.
+        changed('2026-10-01T08:00:00Z', '2026-10-01T08:15:00Z', true);
+        await fixture.whenStable();
+
+        expect(show).not.toHaveBeenCalled();
+        expect(summary(fixture)).toBe('10:00–10:15, 15 min');
+      });
+
+      it('reloads after (re)joining, to catch up on missed changes', async () => {
+        const fixture = await render('2026-10-01');
+
+        hubJoins.next('r2');
+        hubJoins.next('r1');
+        await fixture.whenStable();
+
+        expect(scheduleApi).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });

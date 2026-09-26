@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   inject,
   input,
   signal,
@@ -20,9 +21,10 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, map, merge, of, Subject, switchMap, tap } from 'rxjs';
 import { ApiError, toApiError } from '../../core/api/api-error';
 import { BookingsApi } from '../../core/api/bookings-api';
-import { Guid, LocalDate, ResourceSchedule, UtcDateTime } from '../../core/api/models';
+import { Guid, LocalDate, ResourceSchedule, SlotChange, UtcDateTime } from '../../core/api/models';
 import { ResourcesApi } from '../../core/api/resources-api';
 import { Notifier } from '../../core/notify/notifier';
+import { ScheduleHubService } from '../../core/realtime/schedule-hub.service';
 import {
   addDays,
   formatLongDate,
@@ -44,6 +46,7 @@ import {
   selectStart,
   SlotRange,
 } from './slot-selection';
+import { applySlotChanges } from './slot-changes';
 import { SlotStatus, slotStatus, slotStatusLabel } from './slot-status';
 
 const STATUS_ICONS: Record<SlotStatus, string> = {
@@ -83,6 +86,7 @@ export class SchedulePage {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly hub = inject(ScheduleHubService);
   private readonly viewerTimeZone = inject(VIEWER_TIME_ZONE);
 
   /** The route's `:id`. */
@@ -168,6 +172,26 @@ export class SchedulePage {
   });
 
   constructor() {
+    // Live updates for the resource on screen (task item 7). Watching stops
+    // when the page shows another resource or is left.
+    effect((onCleanup) => {
+      const id = this.id();
+      this.hub.watch(id);
+      onCleanup(() => this.hub.unwatch(id));
+    });
+    toObservable(this.id)
+      .pipe(
+        switchMap((id) =>
+          merge(
+            this.hub.slotsChanged(id).pipe(map((changes) => ({ changes }))),
+            // (Re)joined after a gap in which events may have been missed.
+            this.hub.joined(id).pipe(map(() => ({ changes: null }))),
+          ),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe(({ changes }) => (changes ? this.applyChanges(changes) : this.reload()));
+
     merge(toObservable(this.request), this.reloads.pipe(map(() => this.request())))
       .pipe(
         tap(({ id }) => {
@@ -269,6 +293,28 @@ export class SchedulePage {
           // Network failure or 5xx: keep everything so the user can try again.
         },
       });
+  }
+
+  /**
+   * Applies slots booked or freed by others. If the user's choice is no
+   * longer free, it is cleared with an explanation before they press Book.
+   */
+  private applyChanges(changes: SlotChange[]): void {
+    const schedule = this.schedule();
+    if (!schedule) {
+      return;
+    }
+    const slots = applySlotChanges(schedule.slots, changes);
+    this.schedule.set({ ...schedule, slots });
+    // While the user's own booking is being sent, its event can arrive before
+    // the response; the response decides what happens to the choice.
+    const selection = this.selection();
+    if (selection && !this.booking() && !keepIfAvailable(slots, selection)) {
+      this.selection.set(null);
+      this.notifier.show(
+        'The time you chose has just been booked by someone else. Please choose another.',
+      );
+    }
   }
 
   private updateSelection(
