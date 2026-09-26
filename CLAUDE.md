@@ -241,12 +241,14 @@ Infrastructure ──┘        (implements Application's interfaces)
 
 ## Not built yet
 
-The Angular client and Azure deployment (incl. CORS for the client's
-origin). What exists: the whole backend — Domain, persistence (migrations
-`InitialCreate` and `AddIdentity`), the REST API (auth, resources and
-schedules, bookings) with exception-to-HTTP mapping and Swagger UI, real-time
-updates over SignalR (task item 7), the concurrency test (task item 6), and
-their tests.
+Azure deployment (incl. CORS for the client's origin, if the client is
+served from another origin than the API). What exists: the whole backend —
+Domain, persistence (migrations `InitialCreate` and `AddIdentity`), the
+REST API (auth, resources and schedules, bookings) with exception-to-HTTP
+mapping and Swagger UI, real-time updates over SignalR (task item 7), the
+concurrency test (task item 6), and their tests — and the Angular client in
+`client/` (sign-in, schedules with booking and live updates, my bookings,
+admin pages; see `client/CLAUDE.md`).
 
 ## Tests and databases
 

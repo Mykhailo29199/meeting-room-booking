@@ -1,0 +1,76 @@
+<h1>All bookings</h1>
+
+<div class="filters">
+  <mat-form-field subscriptSizing="dynamic">
+    <mat-label>Resource</mat-label>
+    <mat-select [value]="resourceId() ?? ''" (selectionChange)="filterByResource($event.value)">
+      <mat-option value="">All resources</mat-option>
+      @for (resource of resources(); track resource.id) {
+        <mat-option [value]="resource.id">
+          {{ resource.name }}{{ resource.isActive ? '' : ' (removed)' }}
+        </mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+  <mat-slide-toggle [checked]="includePast()" (change)="showPast($event.checked)">
+    Show past bookings
+  </mat-slide-toggle>
+</div>
+
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Loading bookings" />
+}
+
+@if (error(); as error) {
+  <div class="error" role="alert">
+    <p>{{ error.message }}</p>
+    <button mat-stroked-button type="button" (click)="reload()">Try again</button>
+  </div>
+} @else if (items(); as items) {
+  @if (items.length === 0) {
+    <p class="empty">
+      {{ includePast() ? 'No bookings match.' : 'No upcoming bookings match.' }}
+    </p>
+  } @else {
+    @if (atLimit()) {
+      <p class="limit">
+        Showing the first {{ items.length }} bookings. Filter by resource to see the rest.
+      </p>
+    }
+    <ul class="bookings" aria-label="Bookings">
+      @for (item of items; track item.booking.id) {
+        <li class="booking" [attr.data-state]="item.state">
+          <div class="details">
+            <a
+              class="resource"
+              [routerLink]="['/resources', item.booking.resourceId]"
+              [queryParams]="{ date: item.localDate }"
+            >
+              {{ item.booking.resourceName }}
+            </a>
+            <span class="when">{{ item.date }}, {{ item.time }} ({{ item.duration }})</span>
+            <span class="zone">
+              {{ item.zone }}
+              @if (item.viewerTime) {
+                · starts {{ item.viewerTime }}
+              }
+            </span>
+            <span class="owner">Booked by {{ item.owner }}</span>
+            <span class="state">{{ item.stateLabel }}</span>
+          </div>
+          @if (item.action; as action) {
+            <button
+              mat-stroked-button
+              type="button"
+              [disabled]="cancelling() === item.booking.id"
+              [attr.aria-label]="item.actionLabel"
+              (click)="cancel(item.booking)"
+            >
+              {{ action }}
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  }
+}

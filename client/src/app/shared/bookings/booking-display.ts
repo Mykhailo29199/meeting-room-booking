@@ -6,6 +6,12 @@ import { formatTime, localDateOf, viewerTimeHint, zoneLabel } from '../../core/t
 /** Where a booking is in time. */
 export type BookingState = 'upcoming' | 'in-progress' | 'past';
 
+export const BOOKING_STATE_LABELS: Record<BookingState, string> = {
+  upcoming: 'Upcoming',
+  'in-progress': 'In progress',
+  past: 'Past',
+};
+
 export function bookingState(
   booking: { startUtc: UtcDateTime; endUtc: UtcDateTime },
   nowMs: number,

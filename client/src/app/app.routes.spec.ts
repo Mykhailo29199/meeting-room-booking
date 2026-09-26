@@ -18,7 +18,7 @@ describe('routes', () => {
     expect(guardsOf(path)).toEqual([authGuard]);
   });
 
-  it.each(['admin/resources'])('%s is for admins', (path) => {
+  it.each(['admin/resources', 'admin/bookings'])('%s is for admins', (path) => {
     expect(guardsOf(path)).toEqual([adminGuard]);
   });
 });

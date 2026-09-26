@@ -149,6 +149,20 @@ concurrency control.
    Endpoints with a lock icon need a token; `GET /api/auth/me` shows whose
    token you are using.
 
+## Run the web app
+With the API running (above), start the Angular client in a second terminal:
+```bash
+cd client
+npm ci
+npm start
+```
+Open http://localhost:4200 and sign in with the admin from `Seed:*`, or
+create a regular account. The dev server forwards `/api` and `/hubs` to the
+API, so nothing else needs configuring. To see real-time updates, open the
+same schedule in two browsers (for example a normal and a private window)
+signed in as different users, and book in one of them. More in
+[`client/README.md`](client/README.md).
+
 ## API overview
 All endpoints except register and login need a bearer token. Times in
 requests and responses are UTC; each resource carries its IANA time zone for

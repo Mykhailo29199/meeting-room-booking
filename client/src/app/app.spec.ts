@@ -56,6 +56,7 @@ describe('App shell', () => {
     );
     expect(toolbar.textContent).not.toContain('(admin)');
     expect(toolbar.querySelector('a[href="/admin/resources"]')).toBeNull();
+    expect(toolbar.querySelector('a[href="/admin/bookings"]')).toBeNull();
     expect(toolbar.textContent).toContain('Sign out');
   });
 
@@ -66,6 +67,9 @@ describe('App shell', () => {
     expect(toolbar.textContent).toContain('(admin)');
     expect(toolbar.querySelector('a[href="/admin/resources"]')?.textContent?.trim()).toBe(
       'Manage resources',
+    );
+    expect(toolbar.querySelector('a[href="/admin/bookings"]')?.textContent?.trim()).toBe(
+      'All bookings',
     );
   });
 

@@ -1,0 +1,29 @@
+@use '../../../shared/bookings/booking-list';
+
+:host {
+  display: block;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+h1 {
+  margin: 8px 0 16px;
+  font: var(--mat-sys-headline-small);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  margin-bottom: 16px;
+}
+
+.owner {
+  font: var(--mat-sys-body-medium);
+}
+
+.limit {
+  color: var(--mat-sys-on-surface-variant);
+}

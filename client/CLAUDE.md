@@ -138,7 +138,9 @@ src/app/
               auth/ (login, register), resources/ (list),
               schedule/ (day view, slot list, booking panel),
               bookings/ (mine), admin/ (resources, all bookings)
-  shared/     layout (app shell/toolbar) and small reusable pieces
+  shared/     layout (app shell/toolbar), forms (server errors on fields),
+              bookings (display, cancellation texts and styles shared by the
+              user's and the admin's booking lists)
 ```
 
 - Components: `ChangeDetectionStrategy.OnPush`, signal inputs/outputs, no
@@ -186,7 +188,7 @@ Build the client in these steps, each a working, tested state. Update the
    and the returned counts, restore), `/admin/bookings` (filter by resource,
    include past, cancel any); loading, empty and error states.
 
-**Status:** steps 1–5 are done — dev proxy, environments, `core/api/`
+**Status:** all six steps are done — dev proxy, environments, `core/api/`
 (models, HTTP clients, `toApiError`); `core/auth/` (`AuthService`, the
 interceptor, the guards, `safeReturnUrl`), the login and register pages
 (`shared/forms/showApiErrorOnForm` puts server field errors on the fields),
@@ -198,16 +200,19 @@ parameters bound as inputs; slot states in `slot-status`), booking from the
 schedule (range rules in `slot-selection`: Start/End selects and slot
 clicks, `keepIfAvailable` after every reload; `core/notify/Notifier` for
 snackbars), live schedule updates (`core/realtime/ScheduleHubService`, see
-"Real-time schedule updates"), all with tests. Step 6 lands in three
-commits; two are done: `/my-bookings` (`features/bookings/`: cancel or
-end now after a `core/notify/Confirmer` dialog; `booking-display` shows a
-booking in its resource's zone and is meant for the admin list too;
-durations in `core/time/duration`), and `/admin/resources`
+"Real-time schedule updates"), `/my-bookings` (`features/bookings/`:
+cancel or end now after a `core/notify/Confirmer` dialog; durations in
+`core/time/duration`), `/admin/resources`
 (`features/admin/resources/`: `ResourceFormDialog` saves with the loaded
 `version` and offers Reload on 409; form rules in `resource-form` mirror
 the domain's; remove after a confirmation, with the returned counts;
-restore), linked from the toolbar for admins. `app.routes.spec` pins
-each route's guard. Next: `/admin/bookings` and its toolbar link.
+restore) and `/admin/bookings` (`features/admin/bookings/`: everyone's
+bookings with their owner, filters `?resourceId=&past=true` in the URL,
+cancel any), both linked from the toolbar for admins. Both booking lists
+share `shared/bookings/`: `booking-display` (a booking in its resource's
+zone), `booking-cancellation` (confirmation and result texts) and the
+`_booking-list.scss` styles. `app.routes.spec` pins each route's guard.
+All with tests.
 
 ## Quality bar
 

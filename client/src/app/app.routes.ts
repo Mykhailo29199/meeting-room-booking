@@ -46,5 +46,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/admin/resources/admin-resources-page').then((m) => m.AdminResourcesPage),
   },
+  {
+    // Filters in the URL: ?resourceId=<id>&past=true.
+    path: 'admin/bookings',
+    title: `All bookings · ${appName}`,
+    canActivate: [adminGuard],
+    loadComponent: () =>
+      import('./features/admin/bookings/admin-bookings-page').then((m) => m.AdminBookingsPage),
+  },
   { path: '**', redirectTo: 'resources' },
 ];

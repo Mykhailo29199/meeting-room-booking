@@ -15,18 +15,20 @@ import { RouterLink } from '@angular/router';
 import { catchError, filter, map, merge, of, Subject, switchMap, tap } from 'rxjs';
 import { ApiError, toApiError } from '../../core/api/api-error';
 import { BookingsApi } from '../../core/api/bookings-api';
-import { BookingListItem, CancellationResult } from '../../core/api/models';
+import { BookingListItem } from '../../core/api/models';
 import { Confirmer } from '../../core/notify/confirm-dialog';
 import { Notifier } from '../../core/notify/notifier';
-import { formatTime } from '../../core/time/resource-time';
 import { VIEWER_TIME_ZONE } from '../../core/time/viewer-time-zone';
-import { bookingState, BookingState, describeBooking } from './booking-display';
-
-const STATE_LABELS: Record<BookingState, string> = {
-  upcoming: 'Upcoming',
-  'in-progress': 'In progress',
-  past: 'Past',
-};
+import {
+  cancelAction,
+  cancelConfirmation,
+  cancellationMessage,
+} from '../../shared/bookings/booking-cancellation';
+import {
+  BOOKING_STATE_LABELS,
+  bookingState,
+  describeBooking,
+} from '../../shared/bookings/booking-display';
 
 /**
  * The signed-in user's bookings, earliest first. An upcoming booking can be
@@ -60,12 +62,12 @@ export class MyBookingsPage {
     return this.bookings()?.map((booking) => {
       const state = bookingState(booking, now);
       const display = describeBooking(booking, this.viewerTimeZone);
-      const action = state === 'upcoming' ? 'Cancel' : state === 'in-progress' ? 'End now' : null;
+      const action = cancelAction(booking, now);
       return {
         booking,
         ...display,
         state,
-        stateLabel: STATE_LABELS[state],
+        stateLabel: BOOKING_STATE_LABELS[state],
         action,
         // Buttons in a list need names that say which booking they act on.
         actionLabel: `${action}: ${booking.resourceName}, ${display.date}, ${display.time}`,
@@ -100,24 +102,8 @@ export class MyBookingsPage {
   }
 
   protected cancel(booking: BookingListItem): void {
-    const { date, time, zone } = describeBooking(booking, this.viewerTimeZone);
-    const upcoming = bookingState(booking, Date.now()) === 'upcoming';
     this.confirmer
-      .confirm(
-        upcoming
-          ? {
-              title: 'Cancel this booking?',
-              message: `${booking.resourceName}, ${date}, ${time} (${zone}). The time becomes free for others.`,
-              confirm: 'Cancel booking',
-              dismiss: 'Keep it',
-            }
-          : {
-              title: 'End this booking now?',
-              message: `${booking.resourceName}, ${date}, ${time} (${zone}). The slots that have not started become free for others.`,
-              confirm: 'End now',
-              dismiss: 'Keep it',
-            },
-      )
+      .confirm(cancelConfirmation(booking, this.viewerTimeZone, Date.now()))
       .pipe(
         filter((confirmed) => confirmed),
         tap(() => this.cancelling.set(booking.id)),
@@ -141,12 +127,4 @@ export class MyBookingsPage {
         },
       });
   }
-}
-
-function cancellationMessage(result: CancellationResult, booking: BookingListItem): string {
-  if (result.cancelledCompletely || !result.remainingBooking) {
-    return 'Booking cancelled.';
-  }
-  const end = formatTime(result.remainingBooking.endUtc, booking.resourceTimeZoneId);
-  return `Booking ended early: it now ends at ${end}.`;
 }
