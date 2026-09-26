@@ -1,10 +1,8 @@
 import { Slot } from '../../core/api/models';
 import {
   clickSlot,
-  formatDuration,
   isInRange,
   keepIfAvailable,
-  minutesBetween,
   reachableSlots,
   selectableStarts,
   selectEnd,
@@ -186,20 +184,5 @@ describe('isInRange', () => {
       at('08:15'),
     ]);
     expect(isInRange(slots[1], null)).toBe(false);
-  });
-});
-
-describe('durations', () => {
-  it('counts minutes between two instants', () => {
-    expect(minutesBetween(at('08:00'), at('09:15'))).toBe(75);
-  });
-
-  it.each([
-    [15, '15 min'],
-    [60, '1 h'],
-    [105, '1 h 45 min'],
-    [600, '10 h'],
-  ])('%i minutes is %s', (minutes, text) => {
-    expect(formatDuration(minutes)).toBe(text);
   });
 });

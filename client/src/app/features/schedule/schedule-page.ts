@@ -32,14 +32,13 @@ import {
   isLocalDate,
   toPickerDate,
 } from '../../core/time/local-date';
+import { formatDuration, minutesBetween } from '../../core/time/duration';
 import { formatTime, localDateOf, viewerTimeHint, zoneLabel } from '../../core/time/resource-time';
 import { VIEWER_TIME_ZONE } from '../../core/time/viewer-time-zone';
 import {
   clickSlot,
-  formatDuration,
   isInRange,
   keepIfAvailable,
-  minutesBetween,
   reachableSlots,
   selectableStarts,
   selectEnd,

@@ -198,9 +198,13 @@ parameters bound as inputs; slot states in `slot-status`), booking from the
 schedule (range rules in `slot-selection`: Start/End selects and slot
 clicks, `keepIfAvailable` after every reload; `core/notify/Notifier` for
 snackbars), live schedule updates (`core/realtime/ScheduleHubService`, see
-"Real-time schedule updates"), all with tests. The toolbar gets its admin
-links in step 6, with the pages they lead to; `isAdmin` and `adminGuard`
-exist already. Next is step 6.
+"Real-time schedule updates"), all with tests. Step 6 lands in three
+commits; the first is done: `/my-bookings` (`features/bookings/`: cancel
+or end now after a `core/notify/Confirmer` dialog; `booking-display` shows
+a booking in its resource's zone and is meant for the admin list too;
+durations in `core/time/duration`). Next: `/admin/resources`, then
+`/admin/bookings` with the toolbar's admin links; `isAdmin` and
+`adminGuard` exist already.
 
 ## Quality bar
 

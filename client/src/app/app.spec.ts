@@ -51,6 +51,9 @@ describe('App shell', () => {
     const toolbar = (await render()).querySelector('mat-toolbar')!;
 
     expect(toolbar.textContent).toContain('Ann');
+    expect(toolbar.querySelector('a[href="/my-bookings"]')?.textContent?.trim()).toBe(
+      'My bookings',
+    );
     expect(toolbar.textContent).not.toContain('(admin)');
     expect(toolbar.textContent).toContain('Sign out');
   });

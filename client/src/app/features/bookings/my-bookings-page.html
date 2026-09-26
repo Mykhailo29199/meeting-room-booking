@@ -1,0 +1,58 @@
+<h1>My bookings</h1>
+
+<mat-slide-toggle [checked]="includePast()" (change)="includePast.set($event.checked)">
+  Show past bookings
+</mat-slide-toggle>
+
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Loading your bookings" />
+}
+
+@if (error(); as error) {
+  <div class="error" role="alert">
+    <p>{{ error.message }}</p>
+    <button mat-stroked-button type="button" (click)="reload()">Try again</button>
+  </div>
+} @else if (items(); as items) {
+  @if (items.length === 0) {
+    <p class="empty">
+      {{ includePast() ? 'You have no bookings.' : 'You have no upcoming bookings.' }}
+      <a routerLink="/resources">Find a time to book</a>
+    </p>
+  } @else {
+    <ul class="bookings" aria-label="Your bookings">
+      @for (item of items; track item.booking.id) {
+        <li class="booking" [attr.data-state]="item.state">
+          <div class="details">
+            <a
+              class="resource"
+              [routerLink]="['/resources', item.booking.resourceId]"
+              [queryParams]="{ date: item.localDate }"
+            >
+              {{ item.booking.resourceName }}
+            </a>
+            <span class="when">{{ item.date }}, {{ item.time }} ({{ item.duration }})</span>
+            <span class="zone">
+              {{ item.zone }}
+              @if (item.viewerTime) {
+                · starts {{ item.viewerTime }}
+              }
+            </span>
+            <span class="state">{{ item.stateLabel }}</span>
+          </div>
+          @if (item.action; as action) {
+            <button
+              mat-stroked-button
+              type="button"
+              [disabled]="cancelling() === item.booking.id"
+              [attr.aria-label]="item.actionLabel"
+              (click)="cancel(item.booking)"
+            >
+              {{ action }}
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  }
+}

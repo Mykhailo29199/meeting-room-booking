@@ -32,5 +32,12 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./features/schedule/schedule-page').then((m) => m.SchedulePage),
   },
+  {
+    path: 'my-bookings',
+    title: `My bookings · ${appName}`,
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/bookings/my-bookings-page').then((m) => m.MyBookingsPage),
+  },
   { path: '**', redirectTo: 'resources' },
 ];

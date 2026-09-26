@@ -1,0 +1,72 @@
+:host {
+  display: block;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+h1 {
+  margin: 8px 0 16px;
+  font: var(--mat-sys-headline-small);
+}
+
+mat-slide-toggle {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.error p {
+  color: var(--mat-sys-error);
+}
+
+.empty {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.bookings {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.booking {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--mat-sys-surface-container-low);
+
+  &[data-state='in-progress'] {
+    background: var(--mat-sys-tertiary-container);
+    color: var(--mat-sys-on-tertiary-container);
+  }
+
+  &[data-state='past'] {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.resource {
+  color: inherit;
+  font: var(--mat-sys-title-medium);
+}
+
+.zone,
+.state {
+  font: var(--mat-sys-body-small);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.state {
+  font-weight: 500;
+}
