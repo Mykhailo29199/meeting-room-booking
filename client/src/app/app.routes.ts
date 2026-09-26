@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard } from './core/auth/auth.guards';
+import { adminGuard, authGuard, guestGuard } from './core/auth/auth.guards';
 
 const appName = 'Meeting Room Booking';
 
@@ -38,6 +38,13 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () =>
       import('./features/bookings/my-bookings-page').then((m) => m.MyBookingsPage),
+  },
+  {
+    path: 'admin/resources',
+    title: `Manage resources · ${appName}`,
+    canActivate: [adminGuard],
+    loadComponent: () =>
+      import('./features/admin/resources/admin-resources-page').then((m) => m.AdminResourcesPage),
   },
   { path: '**', redirectTo: 'resources' },
 ];

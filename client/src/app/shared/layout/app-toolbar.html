@@ -14,6 +14,17 @@
       >
         My bookings
       </a>
+      <!-- Only shapes the UI: the API allows admin actions to admins only. -->
+      @if (auth.isAdmin()) {
+        <a
+          mat-button
+          routerLink="/admin/resources"
+          routerLinkActive="active"
+          ariaCurrentWhenActive="page"
+        >
+          Manage resources
+        </a>
+      }
     </nav>
     <span class="spacer"></span>
     <span class="user">

@@ -199,12 +199,15 @@ schedule (range rules in `slot-selection`: Start/End selects and slot
 clicks, `keepIfAvailable` after every reload; `core/notify/Notifier` for
 snackbars), live schedule updates (`core/realtime/ScheduleHubService`, see
 "Real-time schedule updates"), all with tests. Step 6 lands in three
-commits; the first is done: `/my-bookings` (`features/bookings/`: cancel
-or end now after a `core/notify/Confirmer` dialog; `booking-display` shows
-a booking in its resource's zone and is meant for the admin list too;
-durations in `core/time/duration`). Next: `/admin/resources`, then
-`/admin/bookings` with the toolbar's admin links; `isAdmin` and
-`adminGuard` exist already.
+commits; two are done: `/my-bookings` (`features/bookings/`: cancel or
+end now after a `core/notify/Confirmer` dialog; `booking-display` shows a
+booking in its resource's zone and is meant for the admin list too;
+durations in `core/time/duration`), and `/admin/resources`
+(`features/admin/resources/`: `ResourceFormDialog` saves with the loaded
+`version` and offers Reload on 409; form rules in `resource-form` mirror
+the domain's; remove after a confirmation, with the returned counts;
+restore), linked from the toolbar for admins. `app.routes.spec` pins
+each route's guard. Next: `/admin/bookings` and its toolbar link.
 
 ## Quality bar
 

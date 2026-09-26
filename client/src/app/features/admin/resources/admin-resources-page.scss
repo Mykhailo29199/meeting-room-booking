@@ -1,0 +1,74 @@
+:host {
+  display: block;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+h1 {
+  margin: 8px 0;
+  font: var(--mat-sys-headline-small);
+}
+
+.error p {
+  color: var(--mat-sys-error);
+}
+
+.empty {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.resources {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resource {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--mat-sys-surface-container-low);
+
+  &.removed {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name {
+  color: inherit;
+  font: var(--mat-sys-title-medium);
+}
+
+.status {
+  font: var(--mat-sys-label-large);
+}
+
+.removed .status {
+  color: var(--mat-sys-error);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}

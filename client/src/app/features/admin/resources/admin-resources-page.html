@@ -1,0 +1,68 @@
+<div class="heading">
+  <h1>Manage resources</h1>
+  <button mat-flat-button type="button" (click)="add()">
+    <mat-icon aria-hidden="true">add</mat-icon>
+    Add resource
+  </button>
+</div>
+
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Loading resources" />
+}
+
+@if (error(); as error) {
+  <div class="error" role="alert">
+    <p>{{ error.message }}</p>
+    <button mat-stroked-button type="button" (click)="load()">Try again</button>
+  </div>
+} @else if (items(); as items) {
+  @if (items.length === 0) {
+    <p class="empty">No resources yet. Add the first one.</p>
+  } @else {
+    <ul class="resources" aria-label="Resources">
+      @for (item of items; track item.resource.id) {
+        <li class="resource" [class.removed]="!item.resource.isActive">
+          <div class="details">
+            <a class="name" [routerLink]="['/resources', item.resource.id]">
+              {{ item.resource.name }}
+            </a>
+            <span>{{ item.capacity }} · {{ item.hours }}</span>
+            <span class="status">{{ item.resource.isActive ? 'Active' : 'Removed' }}</span>
+          </div>
+          <div class="actions">
+            @if (item.resource.isActive) {
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="busy() === item.resource.id"
+                [attr.aria-label]="'Edit ' + item.resource.name"
+                (click)="edit(item.resource)"
+              >
+                Edit
+              </button>
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="busy() === item.resource.id"
+                [attr.aria-label]="'Remove ' + item.resource.name"
+                (click)="remove(item.resource)"
+              >
+                Remove
+              </button>
+            } @else {
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="busy() === item.resource.id"
+                [attr.aria-label]="'Restore ' + item.resource.name"
+                (click)="restore(item.resource)"
+              >
+                Restore
+              </button>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+  }
+}

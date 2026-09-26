@@ -1,0 +1,90 @@
+<h2 mat-dialog-title>{{ isNew ? 'Add a resource' : 'Edit resource' }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <mat-dialog-content>
+    @if (conflict()) {
+      <div class="conflict" role="alert">
+        <p>
+          Someone else changed this resource after you opened it. Your changes are not saved. Reload
+          to see the current version, then make your changes again.
+        </p>
+        <button mat-flat-button type="button" [disabled]="saving()" (click)="reload()">
+          Reload
+        </button>
+      </div>
+    } @else if (error(); as message) {
+      <p class="form-error" role="alert">{{ message }}</p>
+    }
+
+    <mat-form-field>
+      <mat-label>Name</mat-label>
+      <input matInput formControlName="name" [maxlength]="maxNameLength" required />
+      @if (form.controls.name.hasError('required')) {
+        <mat-error>Enter a name.</mat-error>
+      } @else if (form.controls.name.hasError('server')) {
+        <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>Capacity (people)</mat-label>
+      <input matInput formControlName="capacity" type="number" min="1" step="1" required />
+      @if (form.controls.capacity.hasError('required')) {
+        <mat-error>Enter how many people it holds.</mat-error>
+      } @else if (form.controls.capacity.hasError('min')) {
+        <mat-error>At least 1.</mat-error>
+      } @else if (form.controls.capacity.hasError('server')) {
+        <mat-error>{{ form.controls.capacity.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>Time zone</mat-label>
+      <input matInput formControlName="timeZoneId" [matAutocomplete]="zones" required />
+      <mat-autocomplete #zones="matAutocomplete">
+        @for (zone of zoneOptions(); track zone) {
+          <mat-option [value]="zone">{{ zone }}</mat-option>
+        }
+      </mat-autocomplete>
+      <mat-hint>Opening hours are local times in this zone, e.g. Europe/Berlin.</mat-hint>
+      @if (form.controls.timeZoneId.hasError('required')) {
+        <mat-error>Choose a time zone.</mat-error>
+      } @else if (form.controls.timeZoneId.hasError('timeZone')) {
+        <mat-error>Choose a time zone from the list.</mat-error>
+      } @else if (form.controls.timeZoneId.hasError('server')) {
+        <mat-error>{{ form.controls.timeZoneId.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="hours">
+      <mat-form-field>
+        <mat-label>Opens at</mat-label>
+        <input matInput formControlName="opensAt" type="time" step="900" required />
+        @if (form.controls.opensAt.hasError('required')) {
+          <mat-error>Enter the opening time.</mat-error>
+        } @else if (form.controls.opensAt.hasError('quarterHour')) {
+          <mat-error>Use a quarter hour (:00, :15, :30, :45).</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>Closes at</mat-label>
+        <input matInput formControlName="closesAt" type="time" step="900" required />
+        @if (form.controls.closesAt.hasError('required')) {
+          <mat-error>Enter the closing time.</mat-error>
+        } @else if (form.controls.closesAt.hasError('quarterHour')) {
+          <mat-error>Use a quarter hour (:00, :15, :30, :45).</mat-error>
+        }
+      </mat-form-field>
+    </div>
+    @if (form.hasError('closesBeforeOpening') && form.controls.closesAt.touched) {
+      <p class="form-error">It must close after it opens.</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close>Cancel</button>
+    <button mat-flat-button type="submit" [disabled]="saving() || conflict()">
+      {{ isNew ? 'Add' : 'Save' }}
+    </button>
+  </mat-dialog-actions>
+</form>

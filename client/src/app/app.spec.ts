@@ -55,6 +55,7 @@ describe('App shell', () => {
       'My bookings',
     );
     expect(toolbar.textContent).not.toContain('(admin)');
+    expect(toolbar.querySelector('a[href="/admin/resources"]')).toBeNull();
     expect(toolbar.textContent).toContain('Sign out');
   });
 
@@ -63,6 +64,9 @@ describe('App shell', () => {
     const toolbar = (await render()).querySelector('mat-toolbar')!;
 
     expect(toolbar.textContent).toContain('(admin)');
+    expect(toolbar.querySelector('a[href="/admin/resources"]')?.textContent?.trim()).toBe(
+      'Manage resources',
+    );
   });
 
   it('signs out and goes to the sign-in page', async () => {
