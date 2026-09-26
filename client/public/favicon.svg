@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- A calendar with a check mark: a booked slot. Blue of the app's theme. -->
+  <rect x="1" y="1" width="30" height="30" rx="7" fill="#005cbb"/>
+  <rect x="6.5" y="8.5" width="19" height="17" rx="2.5" fill="#ffffff"/>
+  <rect x="6.5" y="8.5" width="19" height="5" rx="2.5" fill="#9ec2ff"/>
+  <rect x="6.5" y="11" width="19" height="2.5" fill="#9ec2ff"/>
+  <rect x="10" y="5.5" width="2.6" height="5.5" rx="1.3" fill="#ffffff"/>
+  <rect x="19.4" y="5.5" width="2.6" height="5.5" rx="1.3" fill="#ffffff"/>
+  <path d="M11.5 19.2l3.1 3.1 6-6" fill="none" stroke="#005cbb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
