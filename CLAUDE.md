@@ -259,16 +259,36 @@ Infrastructure ──┘        (implements Application's interfaces)
   no foreign key to `AspNetUsers`: accounts and bookings stay decoupled, and
   user ids only ever come from validated tokens.
 
+## Deployment
+
+- Azure, free tiers only (README "Deployment" has the resources, limits and
+  the portal setup): one Linux Web App (plan F1) serving the API and the
+  Angular client, Azure SQL Database (free offer, auto-pause at the free
+  limit), Azure SignalR Service (Free_F1, Default mode). Resources are
+  created by hand in the portal; there is no infrastructure script.
+- `.github/workflows/deploy.yml` builds and tests everything on each push
+  and pull request and deploys `main` when all tests pass: `dotnet
+  publish`, the client's `ng build` copied into `wwwroot`,
+  `azure/webapps-deploy`. Sign-in is OIDC (federated credentials for the
+  `main` branch, role Website Contributor on the Web App only); the deploy
+  job must not use a GitHub environment, which would change the token's
+  subject.
+- Configuration comes from the Web App's settings (`Jwt__Key`, `Seed__*`,
+  `Azure__SignalR__ConnectionString`, `Database__MigrateOnStartup=true`,
+  `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`, connection string
+  `Default`); secrets never go into the repository, and
+  `appsettings.Development*.json` is excluded from publishing.
+
 ## Not built yet
 
-Azure deployment (incl. CORS for the client's origin, if the client is
-served from another origin than the API). What exists: the whole backend —
+Nothing from the task brief. What exists: the whole backend —
 Domain, persistence (migrations `InitialCreate` and `AddIdentity`), the
 REST API (auth, resources and schedules, bookings) with exception-to-HTTP
 mapping and Swagger UI, real-time updates over SignalR (task item 7), the
 concurrency test (task item 6), and their tests — and the Angular client in
 `client/` (sign-in, schedules with booking and live updates, my bookings,
-admin pages; see `client/CLAUDE.md`).
+admin pages; see `client/CLAUDE.md`), deployed to Azure (see
+"Deployment").
 
 ## Tests and databases
 

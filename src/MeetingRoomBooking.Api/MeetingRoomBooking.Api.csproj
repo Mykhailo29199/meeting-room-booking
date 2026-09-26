@@ -23,6 +23,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Development settings hold local secrets and must never be published,
+         even when publishing from a developer's machine. -->
+    <Content Update="appsettings.Development*.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\MeetingRoomBooking.Application\MeetingRoomBooking.Application.csproj" />
     <ProjectReference Include="..\MeetingRoomBooking.Infrastructure\MeetingRoomBooking.Infrastructure.csproj" />
   </ItemGroup>

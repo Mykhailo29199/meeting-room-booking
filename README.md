@@ -3,8 +3,9 @@
 Concurrency-safe meeting room booking with real-time schedule updates
 (ASP.NET Core, Angular, Azure SignalR Service, Azure SQL).
 
-Work in progress — see `CLAUDE.md` for the architecture, design decisions and
-what is built so far.
+Live on Azure (free tiers, so the first request may be slow): see
+[Deployment](#deployment). The architecture and design decisions are in
+`CLAUDE.md`.
 
 ## How double booking is prevented
 
@@ -192,6 +193,75 @@ immediately, without refreshing (SignalR; Azure SignalR Service in Azure).
    — mark those slots booked or free.
 
 Events are sent only after a change is saved, and never say who booked.
+
+## Deployment
+The app runs on Azure, on free tiers only:
+**https://meetingroombooking-dva7g9eng3bde8ht.polandcentral-01.azurewebsites.net**
+(Swagger UI at `/swagger`).
+
+```
+Browser ──HTTPS──> Azure Web App (Linux, .NET 10)
+                    ├─ /               Angular client (wwwroot)
+                    ├─ /api/...        REST API
+                    ├─ /swagger        API docs
+                    └─ /hubs/schedule  negotiate ──> Azure SignalR Service
+                            │
+                            └──> Azure SQL Database
+```
+
+One Web App serves both the API and the client, so there is one origin and
+no CORS. With `Azure:SignalR:ConnectionString` set, browsers negotiate on the
+Web App and then hold their real-time connection with Azure SignalR Service.
+
+| Resource | Tier | Limits that matter here |
+|---|---|---|
+| App Service plan + Web App | Free F1, Linux | 60 CPU minutes a day; sleeps after ~20 idle minutes, so the first request takes a few seconds |
+| Azure SQL Database | free offer (serverless, auto-pause when the monthly free limit is reached) | pauses when idle; the first request after a pause can take up to a minute |
+| Azure SignalR Service | Free_F1, Default mode | 20 concurrent connections, 20,000 messages a day |
+
+### How it is deployed
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs on every
+push and pull request: it builds and tests the backend (including the
+concurrency test) and the client. On `main`, if everything passes, it
+publishes the API, copies the client's build into its `wwwroot` and deploys
+it to the Web App. GitHub signs in to Azure with OpenID Connect: the Web App
+trusts only this repository's `main` branch, so no password or publish
+profile is stored anywhere.
+
+On startup in Azure the app applies pending database migrations itself
+(`Database:MigrateOnStartup`), so a deployment needs no manual database step.
+
+### Setting it up from scratch (Azure portal)
+1. **Resource group** in one region for everything.
+2. **SQL database** with the free offer ("Apply offer"), behaviour when the
+   free limit is reached: *Auto-pause*; a new SQL server with SQL
+   authentication; networking: allow Azure services, no client IP.
+   From *Connection strings → ADO.NET*, fill in the password and set
+   `Connection Timeout=60` (a paused database takes a while to resume).
+3. **SignalR Service**, pricing tier *Free*, service mode *Default*; copy the
+   primary connection string from *Keys*.
+4. **Web App**: Code, .NET 10, Linux, plan *Free F1*, continuous deployment
+   off, no Application Insights. Then *Environment variables*:
+
+   | App setting | Value |
+   |---|---|
+   | `Jwt__Key` | a random secret of 32+ characters |
+   | `Seed__AdminEmail`, `Seed__AdminPassword` | the admin account created on startup |
+   | `Azure__SignalR__ConnectionString` | from step 3 |
+   | `Database__MigrateOnStartup` | `true` |
+   | `ASPNETCORE_FORWARDEDHEADERS_ENABLED` | `true` (TLS ends at App Service's front end; lets the app see HTTPS) |
+
+   and connection string `Default` (type *SQLAzure*) from step 2. Turn on
+   *HTTPS Only*.
+5. **GitHub access**: in Microsoft Entra ID, an app registration with a
+   federated credential for this repository's `main` branch (scenario
+   *GitHub Actions deploying Azure resources*), and the *Website Contributor*
+   role on the Web App only.
+6. **GitHub repository settings**: secrets `AZURE_CLIENT_ID`,
+   `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and variable
+   `AZURE_WEBAPP_NAME`. The next push to `main` deploys.
+
+Secrets live only in the Web App's settings, never in the repository.
 
 ## Development with Claude Code
 This project is built with Claude Code as a pair programmer. I set the

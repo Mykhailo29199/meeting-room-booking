@@ -1,0 +1,95 @@
+# Builds and tests everything on every push and pull request; from main it
+# also deploys to the Azure Web App (the API, serving the Angular client from
+# wwwroot). Nothing is deployed unless every test passes, the concurrency
+# test included.
+#
+# Azure sign-in uses OpenID Connect: the Web App trusts this repository's
+# main branch through a federated credential, so no password or publish
+# profile is stored anywhere. Setup: README, "Deployment".
+name: Build, test and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time; a newer push waits instead of racing it.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      # SQLite, no setup; includes the concurrency test (task item 6).
+      - name: Test the backend
+        run: dotnet test MeetingRoomBooking.slnx --configuration Release
+
+      - name: Install the client's dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Test the client
+        working-directory: client
+        run: npx ng test --watch=false
+
+      - name: Build the client
+        working-directory: client
+        run: npx ng build
+
+      - name: Publish the API with the client in wwwroot
+        run: |
+          dotnet publish src/MeetingRoomBooking.Api --configuration Release --output publish
+          mkdir -p publish/wwwroot
+          cp -r client/dist/booking-client/browser/. publish/wwwroot/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app
+          path: publish
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    # Pull requests are only built and tested.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # No GitHub environment on purpose: it would change the token's subject
+    # to "environment:...", which the federated credential does not trust.
+    permissions:
+      id-token: write # the OIDC token for azure/login
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: app
+          path: publish
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: publish
