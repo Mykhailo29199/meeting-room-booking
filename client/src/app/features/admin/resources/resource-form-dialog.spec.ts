@@ -25,17 +25,25 @@ describe('ResourceFormDialog', () => {
   let update: ReturnType<typeof vi.fn>;
   let getAnswer: Observable<Resource>;
   let get: ReturnType<typeof vi.fn>;
+  // What a Linux server lists: Europe/Kyiv, not the browser's Europe/Kiev.
+  let zonesAnswer: Observable<string[]>;
+  let viewerTimeZone: string;
 
   beforeEach(() => {
     saveAnswer = of(room);
     getAnswer = of(room);
+    zonesAnswer = of(['America/New_York', 'Europe/Berlin', 'Europe/Kyiv']);
+    viewerTimeZone = 'Europe/Berlin';
     create = vi.fn(() => saveAnswer);
     update = vi.fn(() => saveAnswer);
     get = vi.fn(() => getAnswer);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ResourcesApi, useValue: { create, update, get } },
-        { provide: VIEWER_TIME_ZONE, useValue: 'Europe/Berlin' },
+        {
+          provide: ResourcesApi,
+          useValue: { create, update, get, timeZones: () => zonesAnswer },
+        },
+        { provide: VIEWER_TIME_ZONE, useFactory: () => viewerTimeZone },
       ],
     });
   });
@@ -132,6 +140,35 @@ describe('ResourceFormDialog', () => {
     expect(update).not.toHaveBeenCalled();
     expect(dialog.textContent).toContain('Use a quarter hour');
     expect(dialog.textContent).toContain('It must close after it opens.');
+  });
+
+  it("starts in the server's name for the admin's zone", async () => {
+    viewerTimeZone = 'Europe/Kiev'; // what browsers report for Ukraine
+
+    const dialog = await open(null);
+
+    expect(field(dialog, 'timeZoneId').value).toBe('Europe/Kyiv');
+  });
+
+  it('offers only zones this server accepts', async () => {
+    const dialog = await open(room);
+
+    await type(dialog, 'timeZoneId', 'Europe/Kiev');
+    await press(dialog, 'Save');
+
+    expect(update).not.toHaveBeenCalled();
+    expect(dialog.textContent).toContain('Choose a time zone from the list.');
+  });
+
+  it('lets the admin type a zone when the list cannot be loaded, and the server checks it', async () => {
+    zonesAnswer = throwError(() => new HttpErrorResponse({ status: 0 }));
+    const dialog = await open(room);
+    expect(dialog.textContent).toContain('The list of time zones could not be loaded');
+
+    await type(dialog, 'timeZoneId', 'Europe/Kyiv');
+    await press(dialog, 'Save');
+
+    expect(update.mock.lastCall?.[1]).toMatchObject({ timeZoneId: 'Europe/Kyiv' });
   });
 
   it('does not send a time zone that is not in the list', async () => {

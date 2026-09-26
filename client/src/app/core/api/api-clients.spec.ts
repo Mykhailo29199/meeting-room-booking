@@ -100,6 +100,12 @@ describe('API clients', () => {
         `${base}/api/resources/${id}/restore`,
       ]);
     });
+
+    it('asks the server which time zones it accepts', () => {
+      const request = sent(() => TestBed.inject(ResourcesApi).timeZones());
+
+      expect([request.method, request.url]).toEqual(['GET', `${base}/api/time-zones`]);
+    });
   });
 
   describe('BookingsApi', () => {

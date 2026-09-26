@@ -84,6 +84,25 @@ public class ResourceTests
     }
 
     [Fact]
+    public void Every_available_time_zone_is_accepted_and_stored_under_the_listed_id()
+    {
+        // The list clients offer must never contain a zone the check rejects,
+        // nor one stored under another name.
+        Assert.Contains(Berlin, Resource.AvailableTimeZoneIds);
+        foreach (var id in Resource.AvailableTimeZoneIds)
+            Assert.Equal(id, new Resource("Room", 1, id, Eight, Twenty).TimeZoneId);
+    }
+
+    [Fact]
+    public void Available_time_zones_are_iana_ids_sorted_without_duplicates()
+    {
+        var ids = Resource.AvailableTimeZoneIds;
+
+        Assert.Equal(ids.Order(StringComparer.Ordinal).Distinct(), ids);
+        Assert.DoesNotContain("W. Europe Standard Time", ids);
+    }
+
+    [Fact]
     public void Failed_update_leaves_the_resource_unchanged()
     {
         var resource = new Resource("Sunflower", 6, Berlin, Eight, Twenty);

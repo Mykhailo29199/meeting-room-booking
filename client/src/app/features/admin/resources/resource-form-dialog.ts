@@ -24,7 +24,7 @@ import {
   filterTimeZones,
   formValueOf,
   knownTimeZone,
-  knownTimeZones,
+  matchTimeZone,
   MAX_NAME_LENGTH,
   onQuarterHour,
   toResourceRequest,
@@ -62,7 +62,11 @@ export class ResourceFormDialog {
   private readonly dialogRef =
     inject<MatDialogRef<ResourceFormDialog, ResourceFormResult>>(MatDialogRef);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly zones = knownTimeZones();
+
+  /** The zones this server accepts (`GET /api/time-zones`); empty until loaded. */
+  private readonly zones = signal<readonly string[]>([]);
+  /** The list could not be loaded: any id may be typed, and the server checks it. */
+  protected readonly zonesUnavailable = signal(false);
 
   /** The version the edit is based on; replaced by Reload after a conflict. */
   private readonly resource = signal(inject<ResourceFormData>(MAT_DIALOG_DATA).resource);
@@ -73,7 +77,7 @@ export class ResourceFormDialog {
     {
       name: ['', [Validators.required, Validators.maxLength(MAX_NAME_LENGTH)]],
       capacity: [null as number | null, [Validators.required, Validators.min(1)]],
-      timeZoneId: ['', [Validators.required, knownTimeZone(this.zones)]],
+      timeZoneId: ['', [Validators.required, knownTimeZone(() => this.zones())]],
       opensAt: ['', [Validators.required, onQuarterHour]],
       closesAt: ['', [Validators.required, onQuarterHour]],
     },
@@ -83,7 +87,7 @@ export class ResourceFormDialog {
   private readonly typedZone = toSignal(this.form.controls.timeZoneId.valueChanges, {
     initialValue: '',
   });
-  protected readonly zoneOptions = computed(() => filterTimeZones(this.zones, this.typedZone()));
+  protected readonly zoneOptions = computed(() => filterTimeZones(this.zones(), this.typedZone()));
 
   protected readonly saving = signal(false);
   /** A message for the whole form, e.g. a rule the server enforced. */
@@ -93,6 +97,22 @@ export class ResourceFormDialog {
 
   constructor() {
     this.form.setValue(formValueOf(this.resource(), inject(VIEWER_TIME_ZONE)));
+    this.api
+      .timeZones()
+      .pipe(takeUntilDestroyed())
+      .subscribe({
+        next: (zones) => {
+          this.zones.set(zones);
+          const zone = this.form.controls.timeZoneId;
+          // Until the user types: the browser's zone for a new resource, or
+          // the stored one, under the name this server lists (or empty).
+          if (!zone.dirty) {
+            zone.setValue(matchTimeZone(zones, zone.value));
+          }
+          zone.updateValueAndValidity();
+        },
+        error: () => this.zonesUnavailable.set(true),
+      });
   }
 
   protected save(): void {

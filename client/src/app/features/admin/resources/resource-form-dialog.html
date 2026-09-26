@@ -46,7 +46,14 @@
           <mat-option [value]="zone">{{ zone }}</mat-option>
         }
       </mat-autocomplete>
-      <mat-hint>Opening hours are local times in this zone, e.g. Europe/Berlin.</mat-hint>
+      @if (zonesUnavailable()) {
+        <mat-hint
+          >The list of time zones could not be loaded: type an IANA id such as
+          Europe/Berlin.</mat-hint
+        >
+      } @else {
+        <mat-hint>Opening hours are local times in this zone, e.g. Europe/Berlin.</mat-hint>
+      }
       @if (form.controls.timeZoneId.hasError('required')) {
         <mat-error>Choose a time zone.</mat-error>
       } @else if (form.controls.timeZoneId.hasError('timeZone')) {

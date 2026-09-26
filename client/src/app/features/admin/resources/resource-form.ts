@@ -16,9 +16,27 @@ export interface ResourceFormValue {
   closesAt: string;
 }
 
-/** Every IANA time zone the browser knows, for the time zone field. */
-export function knownTimeZones(): string[] {
-  return Intl.supportedValuesOf('timeZone');
+/**
+ * The entry in the server's list for a zone the browser named, or '' if
+ * there is none: the same id, or another name the browser treats as the
+ * same zone (browsers say `Europe/Kiev`, a Linux server lists
+ * `Europe/Kyiv`).
+ */
+export function matchTimeZone(zones: readonly string[], timeZoneId: string): string {
+  if (zones.includes(timeZoneId)) {
+    return timeZoneId;
+  }
+  const canonical = canonicalTimeZone(timeZoneId);
+  return (canonical && zones.find((zone) => canonicalTimeZone(zone) === canonical)) ?? '';
+}
+
+/** The browser's own name for a zone, the same for all its aliases; null if unknown. */
+function canonicalTimeZone(timeZoneId: string): string | null {
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: timeZoneId }).resolvedOptions().timeZone;
+  } catch {
+    return null;
+  }
 }
 
 /** The form's starting values: an existing resource, or defaults for a new one. */
@@ -75,11 +93,17 @@ export const onQuarterHour: ValidatorFn = (control: AbstractControl): Validation
   return minutes === null || minutes % 15 === 0 ? null : { quarterHour: true };
 };
 
-/** `{ timeZone: true }` unless the value is one of the known zones. */
-export function knownTimeZone(zones: readonly string[]): ValidatorFn {
-  const known = new Set(zones);
-  return (control) =>
-    !control.value || known.has(control.value as string) ? null : { timeZone: true };
+/**
+ * `{ timeZone: true }` unless the value is in the server's list. Until the
+ * list has loaded (or if it could not be), anything goes: the server checks.
+ */
+export function knownTimeZone(zones: () => readonly string[]): ValidatorFn {
+  return (control) => {
+    const list = zones();
+    return !control.value || list.length === 0 || list.includes(control.value as string)
+      ? null
+      : { timeZone: true };
+  };
 }
 
 /** On the form: `{ closesBeforeOpening: true }` unless it closes after it opens. */

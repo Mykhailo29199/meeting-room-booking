@@ -28,6 +28,7 @@ full API overview and `../CLAUDE.md` for its design. What the client needs:
 | `GET /api/resources` | signed in | users get bookable resources; admins also removed ones (`isActive: false`) |
 | `GET /api/resources/{id}` | signed in | removed resource → 404 for users |
 | `GET /api/resources/{id}/schedule?date=YYYY-MM-DD` | signed in | the day's 15-minute slots; no `date` = today in the resource's zone |
+| `GET /api/time-zones` | signed in | the IANA zones a resource can have on this server; the resource form offers only these |
 | `POST /api/bookings` | signed in | `{ resourceId, startUtc, endUtc }` → 201; slot taken → 409; rule broken → 400 |
 | `DELETE /api/bookings/{id}` | owner or admin | cancels, or ends early if under way → `CancellationResult` |
 | `GET /api/bookings/mine?includePast=` | signed in | own bookings |
@@ -70,6 +71,10 @@ developer's git-ignored `appsettings.Development.json` (`Seed:*`).
   (e.g. "Berlin time (UTC+2)"); if the viewer's zone differs, add their own
   time as a hint ("10:00 (11:00 your time)"). Use the shared time helpers,
   never `new Date().getHours()` or the browser's zone for resource times.
+- Zone names differ between systems (browsers list `Europe/Kiev`, the
+  Linux server knows only `Europe/Kyiv`), so the resource form offers the
+  server's list (`ResourcesApi.timeZones`), never the browser's, and
+  `matchTimeZone` finds the server's name for the browser's zone.
 - **Never convert user input into UTC.** To book, send back exactly the
   `startUtc` of the first chosen slot and the `endUtc` of the last one, as
   received from the schedule. The server rejects non-UTC times with 400.

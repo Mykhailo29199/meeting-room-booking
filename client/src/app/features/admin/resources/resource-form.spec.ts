@@ -5,6 +5,7 @@ import {
   filterTimeZones,
   formValueOf,
   knownTimeZone,
+  matchTimeZone,
   onQuarterHour,
   toResourceRequest,
 } from './resource-form';
@@ -93,7 +94,7 @@ describe('closesAfterOpening', () => {
 });
 
 describe('knownTimeZone', () => {
-  const validator = knownTimeZone(['Europe/Berlin', 'America/New_York']);
+  const validator = knownTimeZone(() => ['Europe/Berlin', 'America/New_York']);
 
   it('accepts a zone from the list (and leaves an empty field to "required")', () => {
     expect(validator(new FormControl('Europe/Berlin'))).toBeNull();
@@ -102,6 +103,27 @@ describe('knownTimeZone', () => {
 
   it('rejects anything else', () => {
     expect(validator(new FormControl('Berlin'))).toEqual({ timeZone: true });
+  });
+
+  it('leaves the check to the server while there is no list', () => {
+    expect(knownTimeZone(() => [])(new FormControl('Europe/Kyiv'))).toBeNull();
+  });
+});
+
+describe('matchTimeZone', () => {
+  it('takes a zone the server lists as it is', () => {
+    expect(matchTimeZone(['Europe/Berlin', 'Europe/Kiev'], 'Europe/Kiev')).toBe('Europe/Kiev');
+  });
+
+  it("finds the server's name for a zone the browser names differently", () => {
+    // Browsers say Europe/Kiev; a Linux server lists only Europe/Kyiv.
+    expect(matchTimeZone(['Europe/Berlin', 'Europe/Kyiv'], 'Europe/Kiev')).toBe('Europe/Kyiv');
+    expect(matchTimeZone(['Asia/Kolkata'], 'Asia/Calcutta')).toBe('Asia/Kolkata');
+  });
+
+  it('gives nothing for a zone the server does not list', () => {
+    expect(matchTimeZone(['Europe/Berlin'], 'Europe/Paris')).toBe('');
+    expect(matchTimeZone(['Europe/Berlin'], 'Not/AZone')).toBe('');
   });
 });
 

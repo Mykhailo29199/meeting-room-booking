@@ -9,6 +9,7 @@ import {
   Resource,
   ResourceRemovalResult,
   ResourceSchedule,
+  TimeZoneId,
   UpdateResourceRequest,
 } from './models';
 
@@ -16,7 +17,8 @@ import {
 @Injectable({ providedIn: 'root' })
 export class ResourcesApi {
   private readonly http = inject(HttpClient);
-  private readonly url = `${inject(API_BASE_URL)}/api/resources`;
+  private readonly baseUrl = inject(API_BASE_URL);
+  private readonly url = `${this.baseUrl}/api/resources`;
 
   /** Bookable resources for users; admins also get removed ones (`isActive: false`). */
   list(): Observable<Resource[]> {
@@ -53,5 +55,13 @@ export class ResourcesApi {
 
   restore(id: Guid): Observable<Resource> {
     return this.http.post<Resource>(`${this.url}/${id}/restore`, null);
+  }
+
+  /**
+   * The IANA time zones a resource can have on this server, sorted. Offer
+   * these, not the browser's list: names differ between systems.
+   */
+  timeZones(): Observable<TimeZoneId[]> {
+    return this.http.get<TimeZoneId[]>(`${this.baseUrl}/api/time-zones`);
   }
 }

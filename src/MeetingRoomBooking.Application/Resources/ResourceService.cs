@@ -28,6 +28,13 @@ public sealed class ResourceService
         _notifier = notifier;
     }
 
+    /// <summary>
+    /// The IANA time zones a resource can have on this server — the list to
+    /// choose from, since browsers may name zones differently (see
+    /// <see cref="Resource.AvailableTimeZoneIds"/>).
+    /// </summary>
+    public IReadOnlyList<string> ListTimeZones() => Resource.AvailableTimeZoneIds;
+
     /// <summary>Users see the resources they can book; admins also see removed ones.</summary>
     public async Task<IReadOnlyList<ResourceDto>> ListAsync(UserContext user, CancellationToken cancellationToken = default)
     {

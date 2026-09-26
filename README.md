@@ -175,6 +175,7 @@ display.
 | `GET /api/auth/me` | signed in | whose token this is |
 | `GET /api/resources`, `GET /api/resources/{id}` | signed in | resources (admins also see removed ones) |
 | `GET /api/resources/{id}/schedule?date=` | signed in | the day's 15-minute slots: free, booked, past |
+| `GET /api/time-zones` | signed in | the IANA time zones a resource can have on this server |
 | `POST /api/bookings` | signed in | book slots; 409 if someone took them first |
 | `DELETE /api/bookings/{id}` | owner or admin | cancel, or end early if under way |
 | `GET /api/bookings/mine` | signed in | own bookings |

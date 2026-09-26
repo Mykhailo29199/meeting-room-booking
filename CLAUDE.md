@@ -244,6 +244,10 @@ Infrastructure ──┘        (implements Application's interfaces)
   it never converts user input itself.
 - Use `Europe/Berlin` (or another long-stable id) in tests: Windows ICU on
   some machines does not know `Europe/Kyiv`, only the old `Europe/Kiev`.
+  Linux (the Azure App Service) is the opposite, and browsers list
+  `Europe/Kiev`. So clients never offer their own zone list:
+  `Resource.AvailableTimeZoneIds` (built with the same check as a new
+  resource) is served by `GET /api/time-zones` (`TimeZonesController`).
 - **Auth.** ASP.NET Core Identity (users/roles in the same database, via
   `IdentityDbContext<ApplicationUser>`) plus JWT bearer tokens signed with
   HS256 (`Jwt:Key`, ≥ 32 chars; the app refuses to start without it), 60

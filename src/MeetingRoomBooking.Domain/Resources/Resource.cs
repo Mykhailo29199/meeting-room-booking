@@ -142,4 +142,34 @@ public class Resource
             ? ianaId
             : throw new DomainException($"Time zone '{timeZoneId}' has no IANA equivalent.");
     }
+
+    /// <summary>
+    /// Every time zone a resource can use on this system, as the IANA id it is
+    /// stored under, sorted. Systems differ — Windows' ICU may know only
+    /// "Europe/Kiev", a Linux server only "Europe/Kyiv", and browsers list the
+    /// former — so clients offer this list rather than their own. Built with
+    /// the same check as a new resource, so it never offers a zone that the
+    /// check would reject.
+    /// </summary>
+    public static IReadOnlyList<string> AvailableTimeZoneIds => AvailableTimeZones.Value;
+
+    private static readonly Lazy<IReadOnlyList<string>> AvailableTimeZones = new(() =>
+        TimeZoneInfo.GetSystemTimeZones()
+            .Select(zone => TryNormalizeTimeZoneId(zone.Id))
+            .OfType<string>()
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList());
+
+    private static string? TryNormalizeTimeZoneId(string timeZoneId)
+    {
+        try
+        {
+            return NormalizeTimeZoneId(timeZoneId);
+        }
+        catch (DomainException)
+        {
+            return null;
+        }
+    }
 }
