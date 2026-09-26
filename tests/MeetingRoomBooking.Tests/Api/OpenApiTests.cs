@@ -55,12 +55,13 @@ public class OpenApiTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task Docs_are_not_exposed_in_production()
+    public async Task Docs_are_served_in_production_too()
     {
+        // Decided with the Azure deployment: reviewers try the API there.
         using var production = _api.WithWebHostBuilder(builder => builder.UseEnvironment("Production"));
         var client = production.CreateClient();
 
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/openapi/v1.json")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/swagger/index.html")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/openapi/v1.json")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/swagger/index.html")).StatusCode);
     }
 }

@@ -108,6 +108,13 @@ Infrastructure ──┘        (implements Application's interfaces)
     `Jwt` config section, validated on start), `IdentitySeeder`.
   - `DependencyInjection.AddInfrastructure` — registers all of the above;
     needs `ConnectionStrings:Default` and the `Jwt` section.
+  - `Persistence/DatabaseMigrator` — applies pending migrations (creating
+    the database if needed). `Program` runs it before seeding only when
+    `Database:MigrateOnStartup` is true: in Azure, where the free plan runs a
+    single instance, so no two instances migrate at once. Everywhere else it
+    is off (`appsettings.json`) and the schema comes from `dotnet ef database
+    update`; the SQLite tests depend on that. `MigrateOnStartupTests` (SQL
+    Server) checks an empty database gets its schema.
 - `src/MeetingRoomBooking.Api` — controllers, `Program.cs`, middleware.
   Controllers stay thin and only call Application services.
   - `Errors/ApplicationExceptionHandler` — the only place exceptions become
@@ -136,6 +143,10 @@ Infrastructure ──┘        (implements Application's interfaces)
     cancellation token — the change is saved and other viewers must hear of
     it. The message never says who booked. Browsers send the JWT as
     `?access_token=`; `Program` accepts that on the hub path only.
+  - Outside Development: HSTS and HTTPS redirection. In Azure TLS ends at
+    App Service's front end; the app setting
+    `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` makes the app trust its
+    `X-Forwarded-*` headers, so it sees HTTPS (no code for it).
   - Hosts the Angular client: the published app has the client's build in
     `wwwroot` (copied there when publishing; git-ignored), served as static
     files, with `index.html` as the fallback for every other path so client
@@ -144,7 +155,9 @@ Infrastructure ──┘        (implements Application's interfaces)
     (`ClientHostingTests`). One origin, so no CORS. Locally `wwwroot` is
     empty and `ng serve` serves the client.
   - OpenAPI: the built-in document (`/openapi/v1.json`) shown by Swagger UI at
-    `/swagger`, both only outside Production for now (decide at deployment).
+    `/swagger`, in every environment including Production (decided with
+    the deployment: reviewers try the API there; every endpoint except
+    register and login still needs a token).
     `OpenApi/BearerSecurityTransformer` adds the Bearer scheme and marks
     exactly the endpoints that require a token, derived from their
     `[Authorize]`/`[AllowAnonymous]` metadata. Endpoint summaries come from

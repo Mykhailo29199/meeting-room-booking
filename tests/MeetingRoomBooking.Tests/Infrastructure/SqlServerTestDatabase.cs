@@ -47,6 +47,16 @@ internal sealed class SqlServerTestDatabase : ITestDatabase, IAsyncDisposable
         return database;
     }
 
+    /// <summary>
+    /// A name for a database that does not exist yet, for tests in which the
+    /// app itself must create it. Disposing drops it if it was created.
+    /// </summary>
+    public static SqlServerTestDatabase NotCreatedYet() =>
+        new(new SqlConnectionStringBuilder(ServerConnectionString)
+        {
+            InitialCatalog = $"MeetingRoomBookingTests_{Guid.NewGuid():N}"
+        }.ConnectionString);
+
     public UnitOfWork NewUnitOfWork(AppDbContext context) => CreateUnitOfWork(context);
 
     public string ConnectionString => _connectionString;

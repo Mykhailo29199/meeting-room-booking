@@ -5,6 +5,7 @@ using MeetingRoomBooking.Application.Bookings;
 using MeetingRoomBooking.Application.Resources;
 using MeetingRoomBooking.Infrastructure;
 using MeetingRoomBooking.Infrastructure.Identity;
+using MeetingRoomBooking.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -87,30 +88,39 @@ builder.Services.AddExceptionHandler<ApplicationExceptionHandler>();
 
 var app = builder.Build();
 
+// In Azure (Database:MigrateOnStartup=true) the app brings its own schema up
+// to date, so a deployment needs no manual database step. Safe there because
+// the free App Service plan runs a single instance: no two instances migrate
+// at once. Elsewhere the schema comes from `dotnet ef database update`.
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+    await DatabaseMigrator.MigrateAsync(app.Services);
+
 // Roles, plus an admin account if Seed:AdminEmail/Seed:AdminPassword are set.
-// Requires the database schema to exist (dotnet ef database update).
+// Requires the database schema to exist (see above).
 await IdentitySeeder.SeedAsync(app.Services);
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
-// API docs and Swagger UI everywhere except Production (for now; whether the
-// deployed app exposes them is decided with the Azure deployment).
-if (!app.Environment.IsProduction())
+// API docs and Swagger UI in every environment, the deployed app included, so
+// a reviewer can try the API there. They reveal no data: every endpoint
+// except register and login still needs a token.
+app.MapOpenApi();
+app.UseSwaggerUI(options =>
 {
-    app.MapOpenApi();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/openapi/v1.json", "Meeting Room Booking API");
-        options.DocumentTitle = "Meeting Room Booking API";
-    });
-}
+    options.SwaggerEndpoint("/openapi/v1.json", "Meeting Room Booking API");
+    options.DocumentTitle = "Meeting Room Booking API";
+});
 
 // Not in Development: the Angular dev server proxies /api and /hubs to the
 // API's plain-HTTP port, and a redirect to the HTTPS port would send the
-// browser to another origin, where the request fails CORS.
+// browser to another origin, where the request fails CORS. Elsewhere HSTS
+// tells browsers to use HTTPS only. In Azure, TLS ends at App Service's
+// front end; ASPNETCORE_FORWARDEDHEADERS_ENABLED=true (an app setting) lets
+// the app see that the request came over HTTPS.
 if (!app.Environment.IsDevelopment())
 {
+    app.UseHsts();
     app.UseHttpsRedirection();
 }
 
